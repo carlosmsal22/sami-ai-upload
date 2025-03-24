@@ -4,6 +4,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.feature_extraction.text import TfidfVectorizer
 from openai import OpenAI
+import io
 
 # ----------------------------
 # Page config & branding
@@ -22,11 +23,7 @@ Try these to get started:
 - 📈 Suggest possible correlations
 """)
 
-# ----------------------------
-# Main interface
-# ----------------------------
 st.title("SAMI AI – Advanced Analytical Tool")
-
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 uploaded_file = st.file_uploader("Upload an Excel or CSV file", type=["xlsx", "csv"])
@@ -40,36 +37,54 @@ def parse_file(file):
     else:
         return None
 
+def apply_filters(df):
+    st.sidebar.subheader("🔍 Filter Your Data")
+    cat_cols = df.select_dtypes(include="object").columns.tolist()
+    date_cols = df.select_dtypes(include="datetime").columns.tolist()
+
+    filters = {}
+    for col in cat_cols:
+        options = df[col].dropna().unique().tolist()
+        selected = st.sidebar.multiselect(f"{col}", options, default=options)
+        if selected and set(selected) != set(options):
+            filters[col] = selected
+
+    # Optional date filtering
+    if date_cols:
+        for dcol in date_cols:
+            date_range = pd.to_datetime(df[dcol], errors='coerce').dropna()
+            if not date_range.empty:
+                min_date = date_range.min()
+                max_date = date_range.max()
+                start, end = st.sidebar.date_input(f"Date range for {dcol}", [min_date, max_date])
+                filters[dcol] = (start, end)
+
+    filtered_df = df.copy()
+    for col, val in filters.items():
+        if isinstance(val, tuple):  # date
+            filtered_df = filtered_df[
+                (pd.to_datetime(filtered_df[col]) >= pd.to_datetime(val[0])) &
+                (pd.to_datetime(filtered_df[col]) <= pd.to_datetime(val[1]))
+            ]
+        else:
+            filtered_df = filtered_df[filtered_df[col].isin(val)]
+
+    return filtered_df
+
 def generate_basic_chart(df):
     numeric_cols = df.select_dtypes(include="number").columns.tolist()
     if len(numeric_cols) >= 2:
         st.subheader("📊 Auto-Generated Chart")
-        st.markdown("This chart compares the first two numeric columns.")
         fig, ax = plt.subplots()
         df[numeric_cols[:2]].plot(kind='bar', ax=ax)
         st.pyplot(fig)
-
-def show_tfidf_analysis(df):
-    st.subheader("🧠 Text to Numerical Conversion (TF-IDF)")
-    text_cols = df.select_dtypes(include='object').columns.tolist()
-    if not text_cols:
-        st.warning("No text columns found for TF-IDF conversion.")
-        return
-
-    selected_col = st.selectbox("Select a text column to convert:", text_cols)
-    if selected_col:
-        try:
-            vectorizer = TfidfVectorizer(max_features=20)
-            tfidf_matrix = vectorizer.fit_transform(df[selected_col].fillna("").astype(str))
-            tfidf_df = pd.DataFrame(tfidf_matrix.toarray(), columns=vectorizer.get_feature_names_out())
-            st.dataframe(tfidf_df)
-        except Exception as e:
-            st.error(f"TF-IDF processing error: {e}")
 
 def summarize_data(df):
     st.subheader("📈 Summary Statistics")
     summary = df.describe(include='all').transpose()
     st.dataframe(summary)
+    csv = summary.to_csv().encode('utf-8')
+    st.download_button("Download Summary CSV", data=csv, file_name="summary_stats.csv", mime='text/csv')
     return summary.to_string()
 
 def show_grouped_insights(df):
@@ -79,71 +94,65 @@ def show_grouped_insights(df):
 
     if not cat_cols or not num_cols:
         st.info("Grouped insights require at least one categorical and one numeric column.")
-        return None, None, None
+        return None, None, None, None
 
     cat_col = st.selectbox("Group by (categorical column):", cat_cols, key="cat_col")
     num_col = st.selectbox("Aggregate (numeric column):", num_cols, key="num_col")
     agg_func = st.selectbox("Aggregation method:", ["mean", "sum", "count"], key="agg_func")
 
+    grouped_df = None
     if st.button("Generate Grouped Insights"):
-        grouped = df.groupby(cat_col)[num_col].agg(agg_func).reset_index()
-        st.dataframe(grouped)
+        grouped_df = df.groupby(cat_col)[num_col].agg(agg_func).reset_index()
+        st.dataframe(grouped_df)
 
-        st.subheader("📈 Chart")
         fig, ax = plt.subplots()
-        grouped.plot(x=cat_col, y=num_col, kind="bar", ax=ax, legend=False)
+        grouped_df.plot(x=cat_col, y=num_col, kind="bar", ax=ax, legend=False)
         plt.ylabel(f"{agg_func} of {num_col}")
         st.pyplot(fig)
 
-        return grouped.to_string(index=False), cat_col, num_col
-    return None, None, None
+        csv = grouped_df.to_csv(index=False).encode('utf-8')
+        st.download_button("Download Grouped Data CSV", data=csv, file_name="grouped_data.csv", mime='text/csv')
+
+    return grouped_df.to_string(index=False) if grouped_df is not None else "", cat_col, num_col
 
 if st.button("Analyze"):
     if uploaded_file:
         try:
             df = parse_file(uploaded_file)
             file_info = f"The uploaded file contains {df.shape[0]} rows and {df.shape[1]} columns."
+            df_filtered = apply_filters(df)
         except Exception as e:
             st.error(f"Error reading file: {e}")
             st.stop()
     else:
-        file_info = "No file uploaded."
-        df = None
+        st.warning("Please upload a file to begin.")
+        st.stop()
 
-    # Show TF-IDF block
-    show_tfidf_analysis(df)
-
-    # Show summary block
-    summary_text = summarize_data(df) if df is not None else ""
-
-    # Smart chart from prompt
+    summary_text = summarize_data(df_filtered)
     keywords = ['chart', 'graph', 'visual', 'compare', 'trend']
-    if df is not None and any(kw in user_prompt.lower() for kw in keywords):
+    if any(kw in user_prompt.lower() for kw in keywords):
         try:
-            generate_basic_chart(df)
+            generate_basic_chart(df_filtered)
         except Exception as e:
-            st.warning("Chart generation failed. Try refining your data.")
+            st.warning("Chart generation failed.")
 
-    # Grouped analysis block
-    if df is not None:
-        grouped_str, cat_col, num_col = show_grouped_insights(df)
-    else:
-        grouped_str, cat_col, num_col = None, None, None
+    grouped_str, cat_col, num_col = show_grouped_insights(df_filtered)
+    insight_output = ""
 
-    # Send summary + grouped results to GPT
-    if df is not None:
+    if df_filtered is not None:
         system_parts = [
             f"You are SAMI AI, an advanced analytics assistant.",
             file_info,
-            f"Here are summary statistics for the file:\n{summary_text}",
+            f"Filtered data has {df_filtered.shape[0]} rows.",
+            f"Summary statistics:\n{summary_text}"
         ]
         if grouped_str:
-            system_parts.append(f"Here is a grouped {cat_col} vs {num_col} insight:
+            system_parts.append(f"Grouped result for {cat_col} vs {num_col}:
 {grouped_str}")
         system_prompt = "\n\n".join(system_parts)
 
         try:
-            with st.spinner("Generating insights..."):
+            with st.spinner("Generating GPT insight..."):
                 response = client.chat.completions.create(
                     model="gpt-3.5-turbo",
                     messages=[
@@ -151,6 +160,11 @@ if st.button("Analyze"):
                         {"role": "user", "content": user_prompt}
                     ]
                 )
-                st.markdown(response.choices[0].message.content)
+                insight_output = response.choices[0].message.content
+                st.markdown(insight_output)
+
+                # Offer download
+                txt_bytes = insight_output.encode('utf-8')
+                st.download_button("Download GPT Insight", txt_bytes, file_name="gpt_insight.txt", mime='text/plain')
         except Exception as e:
             st.error(f"API error: {e}")
