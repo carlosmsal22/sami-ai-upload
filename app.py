@@ -89,8 +89,7 @@ if st.button("Analyze"):
         except Exception as e:
             st.warning("Chart generation failed. Try refining your data.")
 
-    system_prompt = f"You are SAMI AI, an advanced analytics assistant. {file_info} The first few rows of the file look like this:
-{data_sample}"
+    system_prompt = f"You are SAMI AI, an advanced analytics assistant. {file_info} The first few rows of the file look like this:\n{data_sample}"
 
     try:
         with st.spinner("Generating insights..."):
@@ -104,4 +103,3 @@ if st.button("Analyze"):
             st.markdown(response['choices'][0]['message']['content'])
     except Exception as e:
         st.error(f"API error: {e}")
-
