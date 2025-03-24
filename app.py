@@ -147,8 +147,7 @@ if st.button("Analyze"):
             f"Summary statistics:\n{summary_text}"
         ]
         if grouped_str:
-            system_parts.append(f"Grouped result for {cat_col} vs {num_col}:
-{grouped_str}")
+            system_parts.append(f"Grouped result for {cat_col} vs {num_col}:\n{grouped_str}")
         system_prompt = "\n\n".join(system_parts)
 
         try:
