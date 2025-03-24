@@ -1,6 +1,6 @@
-fastapi
-uvicorn
+streamlit
+openai>=1.2.4
 pandas
 openpyxl
 matplotlib
-seaborn
+scikit-learn
