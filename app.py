@@ -72,6 +72,32 @@ def summarize_data(df):
     st.dataframe(summary)
     return summary.to_string()
 
+def show_grouped_insights(df):
+    st.subheader("📊 Grouped Insights")
+    cat_cols = df.select_dtypes(include='object').columns.tolist()
+    num_cols = df.select_dtypes(include='number').columns.tolist()
+
+    if not cat_cols or not num_cols:
+        st.info("Grouped insights require at least one categorical and one numeric column.")
+        return None, None, None
+
+    cat_col = st.selectbox("Group by (categorical column):", cat_cols, key="cat_col")
+    num_col = st.selectbox("Aggregate (numeric column):", num_cols, key="num_col")
+    agg_func = st.selectbox("Aggregation method:", ["mean", "sum", "count"], key="agg_func")
+
+    if st.button("Generate Grouped Insights"):
+        grouped = df.groupby(cat_col)[num_col].agg(agg_func).reset_index()
+        st.dataframe(grouped)
+
+        st.subheader("📈 Chart")
+        fig, ax = plt.subplots()
+        grouped.plot(x=cat_col, y=num_col, kind="bar", ax=ax, legend=False)
+        plt.ylabel(f"{agg_func} of {num_col}")
+        st.pyplot(fig)
+
+        return grouped.to_string(index=False), cat_col, num_col
+    return None, None, None
+
 if st.button("Analyze"):
     if uploaded_file:
         try:
@@ -87,23 +113,37 @@ if st.button("Analyze"):
     # Show TF-IDF block
     show_tfidf_analysis(df)
 
-    # Generate chart if relevant
+    # Show summary block
+    summary_text = summarize_data(df) if df is not None else ""
+
+    # Smart chart from prompt
     keywords = ['chart', 'graph', 'visual', 'compare', 'trend']
-    if any(kw in user_prompt.lower() for kw in keywords):
+    if df is not None and any(kw in user_prompt.lower() for kw in keywords):
         try:
             generate_basic_chart(df)
         except Exception as e:
             st.warning("Chart generation failed. Try refining your data.")
 
+    # Grouped analysis block
     if df is not None:
-        summary_text = summarize_data(df)
-        system_prompt = (
-            f"You are SAMI AI, an advanced analytics assistant. "
-            f"{file_info}\nHere are the summary statistics of the uploaded data:\n{summary_text}"
-        )
+        grouped_str, cat_col, num_col = show_grouped_insights(df)
+    else:
+        grouped_str, cat_col, num_col = None, None, None
+
+    # Send summary + grouped results to GPT
+    if df is not None:
+        system_parts = [
+            f"You are SAMI AI, an advanced analytics assistant.",
+            file_info,
+            f"Here are summary statistics for the file:\n{summary_text}",
+        ]
+        if grouped_str:
+            system_parts.append(f"Here is a grouped {cat_col} vs {num_col} insight:
+{grouped_str}")
+        system_prompt = "\n\n".join(system_parts)
 
         try:
-            with st.spinner("Generating insights from summary..."):
+            with st.spinner("Generating insights..."):
                 response = client.chat.completions.create(
                     model="gpt-3.5-turbo",
                     messages=[
