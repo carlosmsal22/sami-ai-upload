@@ -1,5 +1,6 @@
 import streamlit as st
 import openai
+import os
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -26,7 +27,7 @@ Try these to get started:
 # ----------------------------
 st.title("SAMI AI – Advanced Analytical Tool")
 
-openai.api_key = st.secrets["OPENAI_API_KEY"]
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 uploaded_file = st.file_uploader("Upload an Excel or CSV file", type=["xlsx", "csv"])
 user_prompt = st.text_area("Ask a question about your uploaded file or type any data-related query:")
