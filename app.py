@@ -2,7 +2,7 @@ import streamlit as st
 import openai
 import pandas as pd
 import matplotlib.pyplot as plt
-import io
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 # ----------------------------
 # Page config & branding
@@ -48,6 +48,23 @@ def generate_basic_chart(df):
         df[numeric_cols[:2]].plot(kind='bar', ax=ax)
         st.pyplot(fig)
 
+def show_tfidf_analysis(df):
+    st.subheader("🧠 Text to Numerical Conversion (TF-IDF)")
+    text_cols = df.select_dtypes(include='object').columns.tolist()
+    if not text_cols:
+        st.warning("No text columns found for TF-IDF conversion.")
+        return
+
+    selected_col = st.selectbox("Select a text column to convert:", text_cols)
+    if selected_col:
+        try:
+            vectorizer = TfidfVectorizer(max_features=20)
+            tfidf_matrix = vectorizer.fit_transform(df[selected_col].fillna("").astype(str))
+            tfidf_df = pd.DataFrame(tfidf_matrix.toarray(), columns=vectorizer.get_feature_names_out())
+            st.dataframe(tfidf_df)
+        except Exception as e:
+            st.error(f"TF-IDF processing error: {e}")
+
 if st.button("Analyze"):
     if uploaded_file:
         try:
@@ -61,7 +78,10 @@ if st.button("Analyze"):
         data_sample = ""
         file_info = "No file uploaded."
 
-    # Generate a chart if relevant prompt
+    # Show TF-IDF block
+    show_tfidf_analysis(df)
+
+    # Generate chart if prompt is related to visualization
     keywords = ['chart', 'graph', 'visual', 'compare', 'trend']
     if any(kw in user_prompt.lower() for kw in keywords):
         try:
@@ -84,3 +104,4 @@ if st.button("Analyze"):
             st.markdown(response['choices'][0]['message']['content'])
     except Exception as e:
         st.error(f"API error: {e}")
+
