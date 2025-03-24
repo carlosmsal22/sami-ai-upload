@@ -1,9 +1,9 @@
 import streamlit as st
-import openai
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
 from sklearn.feature_extraction.text import TfidfVectorizer
+from openai import OpenAI
 
 # ----------------------------
 # Page config & branding
@@ -27,7 +27,7 @@ Try these to get started:
 # ----------------------------
 st.title("SAMI AI – Advanced Analytical Tool")
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 uploaded_file = st.file_uploader("Upload an Excel or CSV file", type=["xlsx", "csv"])
 user_prompt = st.text_area("Ask a question about your uploaded file or type any data-related query:")
@@ -94,13 +94,13 @@ if st.button("Analyze"):
 
     try:
         with st.spinner("Generating insights..."):
-            response = openai.ChatCompletion.create(
+            response = client.chat.completions.create(
                 model="gpt-4",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ]
             )
-            st.markdown(response['choices'][0]['message']['content'])
+            st.markdown(response.choices[0].message.content)
     except Exception as e:
         st.error(f"API error: {e}")
