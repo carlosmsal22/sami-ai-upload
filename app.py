@@ -167,3 +167,124 @@ if st.button("Analyze"):
                 st.download_button("Download GPT Insight", txt_bytes, file_name="gpt_insight.txt", mime='text/plain')
         except Exception as e:
             st.error(f"API error: {e}")
+
+# ----------------------------
+# Correlation Matrix Section
+# ----------------------------
+def show_correlation_matrix(df):
+    numeric_cols = df.select_dtypes(include='number')
+    if numeric_cols.shape[1] < 2:
+        st.info("Need at least 2 numeric columns to compute correlation.")
+        return None
+
+    st.subheader("📊 Correlation Matrix")
+    corr = numeric_cols.corr()
+    st.dataframe(corr.round(2))
+
+    import seaborn as sns
+    import matplotlib.pyplot as plt
+    fig, ax = plt.subplots(figsize=(8, 6))
+    sns.heatmap(corr, annot=True, cmap="coolwarm", fmt=".2f", ax=ax)
+    st.pyplot(fig)
+
+    return corr.to_string()
+
+# ----------------------------
+# PCA Visualization Section
+# ----------------------------
+def run_pca(df):
+    from sklearn.decomposition import PCA
+    from sklearn.preprocessing import StandardScaler
+
+    numeric_cols = df.select_dtypes(include='number')
+    if numeric_cols.shape[1] < 2:
+        st.info("Need at least 2 numeric columns for PCA.")
+        return None
+
+    st.subheader("🔎 Principal Component Analysis (PCA)")
+
+    cat_cols = df.select_dtypes(include='object').columns.tolist()
+    color_by = st.selectbox("Color PCA points by (optional category):", ["None"] + cat_cols)
+
+    df_clean = numeric_cols.dropna()
+    scaler = StandardScaler()
+    scaled = scaler.fit_transform(df_clean)
+
+    pca = PCA(n_components=2)
+    pcs = pca.fit_transform(scaled)
+    pca_df = pd.DataFrame(pcs, columns=["PC1", "PC2"])
+    if color_by != "None" and color_by in df.columns:
+        pca_df[color_by] = df.loc[df_clean.index, color_by].values
+
+    fig, ax = plt.subplots()
+    if color_by != "None" and color_by in pca_df.columns:
+        for grp in pca_df[color_by].unique():
+            subset = pca_df[pca_df[color_by] == grp]
+            ax.scatter(subset["PC1"], subset["PC2"], label=grp, alpha=0.6)
+        ax.legend()
+    else:
+        ax.scatter(pca_df["PC1"], pca_df["PC2"], alpha=0.6)
+
+    ax.set_xlabel("Principal Component 1")
+    ax.set_ylabel("Principal Component 2")
+    st.pyplot(fig)
+
+    explained_var = pca.explained_variance_ratio_
+    st.markdown(f"**Explained Variance:** PC1: {explained_var[0]:.2%}, PC2: {explained_var[1]:.2%}")
+
+    return f"PCA explained variance: PC1={explained_var[0]:.2%}, PC2={explained_var[1]:.2%}"
+
+# Extend Analyze block
+if uploaded_file:
+    if st.button("Analyze"):
+        try:
+            df = parse_file(uploaded_file)
+            file_info = f"The uploaded file contains {df.shape[0]} rows and {df.shape[1]} columns."
+            df_filtered = apply_filters(df)
+        except Exception as e:
+            st.error(f"Error reading file: {e}")
+            st.stop()
+
+        summary_text = summarize_data(df_filtered)
+        if any(kw in user_prompt.lower() for kw in ['chart', 'graph', 'visual', 'compare', 'trend']):
+            try:
+                generate_basic_chart(df_filtered)
+            except Exception:
+                st.warning("Chart generation failed.")
+
+        grouped_str, cat_col, num_col = show_grouped_insights(df_filtered)
+
+        corr_text = show_correlation_matrix(df_filtered)
+        pca_text = run_pca(df_filtered)
+
+        # GPT context building
+        if df_filtered is not None:
+            system_parts = [
+                "You are SAMI AI, an advanced analytics assistant.",
+                file_info,
+                f"Filtered data has {df_filtered.shape[0]} rows.",
+                f"Summary statistics:\n{summary_text}"
+            ]
+            if grouped_str:
+                system_parts.append(f"Grouped result for {cat_col} vs {num_col}:\n{grouped_str}")
+            if corr_text:
+                system_parts.append(f"Correlation matrix:\n{corr_text}")
+            if pca_text:
+                system_parts.append(f"PCA Summary:\n{pca_text}")
+            system_prompt = "\n\n".join(system_parts)
+
+            try:
+                with st.spinner("Generating GPT insight..."):
+                    response = client.chat.completions.create(
+                        model="gpt-3.5-turbo",
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt}
+                        ]
+                    )
+                    insight_output = response.choices[0].message.content
+                    st.markdown(insight_output)
+                    txt_bytes = insight_output.encode('utf-8')
+                    st.download_button("Download GPT Insight", txt_bytes, file_name="gpt_insight.txt", mime='text/plain')
+            except Exception as e:
+                st.error(f"API error: {e}")
