@@ -1,9 +1,29 @@
 import streamlit as st
 import openai
 import pandas as pd
+import matplotlib.pyplot as plt
 import io
 
+# ----------------------------
+# Page config & branding
+# ----------------------------
 st.set_page_config(page_title="SAMI AI – Excel Analyzer", layout="wide")
+
+# Sidebar: Branding + Prompt Templates
+st.sidebar.image("https://nextaigeninsights.com/wp-content/uploads/2023/10/INSIGHTS-AI-LOGO-White-Transparent.png", use_column_width=True)
+st.sidebar.title("💡 Prompt Templates")
+st.sidebar.markdown("""
+Try these to get started:
+- 🔍 Find the top 5 categories by revenue
+- 📊 Summarize data trends by region
+- ⚖️ Compare performance across time
+- 🧠 Show any outliers or unusual values
+- 📈 Suggest possible correlations
+""")
+
+# ----------------------------
+# Main interface
+# ----------------------------
 st.title("SAMI AI – Advanced Analytical Tool")
 
 openai.api_key = st.secrets["OPENAI_API_KEY"]
@@ -19,6 +39,15 @@ def parse_file(file):
     else:
         return None
 
+def generate_basic_chart(df):
+    numeric_cols = df.select_dtypes(include="number").columns.tolist()
+    if len(numeric_cols) >= 2:
+        st.subheader("📊 Auto-Generated Chart")
+        st.markdown("This chart compares the first two numeric columns.")
+        fig, ax = plt.subplots()
+        df[numeric_cols[:2]].plot(kind='bar', ax=ax)
+        st.pyplot(fig)
+
 if st.button("Analyze"):
     if uploaded_file:
         try:
@@ -31,6 +60,14 @@ if st.button("Analyze"):
     else:
         data_sample = ""
         file_info = "No file uploaded."
+
+    # Generate a chart if relevant prompt
+    keywords = ['chart', 'graph', 'visual', 'compare', 'trend']
+    if any(kw in user_prompt.lower() for kw in keywords):
+        try:
+            generate_basic_chart(df)
+        except Exception as e:
+            st.warning("Chart generation failed. Try refining your data.")
 
     system_prompt = f"You are SAMI AI, an advanced analytics assistant. {file_info} The first few rows of the file look like this:
 {data_sample}"
