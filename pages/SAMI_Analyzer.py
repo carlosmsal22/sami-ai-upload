@@ -77,11 +77,11 @@ if uploaded_file and st.button("Analyze"):
     corr = show_correlation(df)
     pca = show_pca(df)
 
-    system_prompt = f"You are SAMI AI, an analytics assistant. Summary:\n{summary}\nCorrelation:\n{corr}\n{pca}"
-{summary}
-Correlation:
-{corr}
-{pca}"
+    system_prompt = (
+    f"You are SAMI AI, an analytics assistant. "
+    f"Summary:\n{summary}\nCorrelation:\n{corr}\n{pca}"
+)
+
     try:
         response = client.chat.completions.create(
             model="gpt-3.5-turbo",
