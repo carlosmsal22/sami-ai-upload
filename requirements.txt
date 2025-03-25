@@ -1,4 +1,4 @@
-streamlit
+streamlit>=1.10
 openai>=1.2.4
 pandas
 openpyxl
