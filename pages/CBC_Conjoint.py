@@ -46,7 +46,8 @@ if uploaded_file:
         st.pyplot(fig)
 
         # GPT interpretation
-        system_prompt = f"You are a research analyst. Based on these part-worth utilities from a CBC model:
+        system_prompt = f"You are a research analyst. Based on these part-worth utilities from a CBC model:\\n{utilities.to_string()}"
+        :
 {utilities.to_string()}"
 
         try:
