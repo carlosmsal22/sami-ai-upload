@@ -69,14 +69,12 @@ if uploaded_file and st.button("Analyze"):
         generate_visuals(df)
 
         system_prompt = (
-            f"You are SAMI AI, a senior data analyst. Below is an overview of a dataset with {df.shape[0]} rows and {df.shape[1]} columns.
-"
-            f"Column breakdown:
-{column_summary}
-"
-            f"Please analyze the dataset using best practices for exploratory data analysis (EDA) "
-            f"and answer the user’s question or provide general insights."
-        )
+            system_prompt = (
+    f"You are SAMI AI, a senior data analyst. Below is an overview of a dataset with {df.shape[0]} rows and {df.shape[1]} columns.\n"
+    f"Column breakdown:\n{column_summary}\n"
+    f"Please analyze the dataset using best practices for exploratory data analysis (EDA) "
+    f"and answer the user’s question or provide general insights."
+)
 
         with st.spinner("GPT is analyzing your dataset..."):
             response = client.chat.completions.create(
