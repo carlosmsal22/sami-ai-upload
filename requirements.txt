@@ -9,3 +9,4 @@ statsmodels
 semopy
 wordcloud
 scikit-learn
+fpdf
