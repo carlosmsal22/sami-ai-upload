@@ -11,9 +11,10 @@ import os
 from openai import OpenAI
 from io import BytesIO
 from datetime import datetime
+from fpdf import FPDF
 
 st.set_page_config(page_title="SAMI Analyzer", layout="wide")
-st.title("📊 SAMI AI – Advanced Analytical Tool")
+st.title("📊 SAMI AI – Advanced Analytical Tool with PDF Export")
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -24,7 +25,7 @@ show_corr = st.checkbox("🔗 Correlation Matrix")
 show_pca = st.checkbox("🔬 PCA (2D Projection)")
 show_cluster = st.checkbox("🧭 KMeans Clustering")
 show_tfidf = st.checkbox("📝 TF-IDF on Text Columns")
-show_export = st.checkbox("📥 Export Results (Markdown Summary)")
+show_pdf = st.checkbox("📄 Export PDF Report")
 
 summary_output = ""
 
@@ -110,6 +111,17 @@ def generate_visuals(df):
                 st.bar_chart(top_terms)
                 summary_output += f"\n\n**TF-IDF for {col}:**\n{top_terms.to_string()}"
 
+def generate_pdf(text, filename="sami_report.pdf"):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=10)
+    for line in text.splitlines():
+        pdf.multi_cell(0, 5, line)
+    buffer = BytesIO()
+    pdf.output(buffer)
+    buffer.seek(0)
+    return buffer
+
 if uploaded_file and st.button("Analyze"):
     try:
         df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith(".csv") else pd.read_excel(uploaded_file)
@@ -145,13 +157,11 @@ if uploaded_file and st.button("Analyze"):
             st.markdown(gpt_reply)
             summary_output += f"\n\n## GPT Insight\n{gpt_reply}"
 
-        if show_export:
-            st.subheader("📥 Download Report")
-            buffer = BytesIO()
-            filename = f"SAMI_Report_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.md"
-            buffer.write(summary_output.encode("utf-8"))
-            buffer.seek(0)
-            st.download_button("📄 Download Markdown Report", buffer, file_name=filename, mime="text/markdown")
+        if show_pdf:
+            st.subheader("📄 Download PDF Report")
+            pdf_file = generate_pdf(summary_output)
+            filename = f"SAMI_Report_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.pdf"
+            st.download_button("📥 Download PDF", pdf_file, file_name=filename, mime="application/pdf")
 
     except Exception as e:
         st.error(f"Error: {e}")
