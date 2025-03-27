@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 import os
 from openai import OpenAI
 
@@ -30,6 +31,31 @@ def describe_columns(df):
         report.append(f"- {col}: {summary}")
     return "\n".join(report)
 
+def generate_visuals(df):
+    st.subheader("📊 Auto-Generated Visualizations")
+    numeric_cols = df.select_dtypes(include=np.number).columns
+    categorical_cols = df.select_dtypes(include='object').columns
+
+    for col in numeric_cols:
+        fig, ax = plt.subplots()
+        df[col].dropna().hist(ax=ax, bins=20)
+        ax.set_title(f"Histogram of {col}")
+        st.pyplot(fig)
+
+    for col in categorical_cols:
+        if df[col].nunique() <= 20:
+            fig, ax = plt.subplots()
+            df[col].value_counts().plot(kind="bar", ax=ax)
+            ax.set_title(f"Bar Plot of {col}")
+            st.pyplot(fig)
+
+    if len(numeric_cols) >= 2:
+        st.subheader("🔗 Correlation Matrix")
+        corr = df[numeric_cols].corr()
+        fig, ax = plt.subplots(figsize=(8, 5))
+        sns.heatmap(corr, annot=True, fmt=".2f", cmap="coolwarm", ax=ax)
+        st.pyplot(fig)
+
 if uploaded_file and st.button("Analyze"):
     try:
         df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith(".csv") else pd.read_excel(uploaded_file)
@@ -39,6 +65,8 @@ if uploaded_file and st.button("Analyze"):
         st.subheader("📑 Column Summary")
         column_summary = describe_columns(df)
         st.text(column_summary)
+
+        generate_visuals(df)
 
         system_prompt = (
             f"You are SAMI AI, a senior data analyst. Below is an overview of a dataset with {df.shape[0]} rows and {df.shape[1]} columns.
