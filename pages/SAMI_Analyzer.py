@@ -8,6 +8,8 @@ from sklearn.cluster import KMeans
 from sklearn.feature_extraction.text import TfidfVectorizer
 import os
 from openai import OpenAI
+from io import BytesIO
+from datetime import datetime
 
 st.set_page_config(page_title="SAMI Analyzer", layout="wide")
 st.title("📊 SAMI AI – Advanced Analytical Tool")
@@ -21,6 +23,9 @@ show_corr = st.checkbox("🔗 Correlation Matrix")
 show_pca = st.checkbox("🔬 PCA (2D Projection)")
 show_cluster = st.checkbox("🧭 KMeans Clustering")
 show_tfidf = st.checkbox("📝 TF-IDF on Text Columns")
+show_export = st.checkbox("📥 Export Results (Markdown Summary)")
+
+summary_output = ""
 
 def describe_columns(df):
     report = []
@@ -40,6 +45,7 @@ def describe_columns(df):
     return "\n".join(report)
 
 def generate_visuals(df):
+    global summary_output
     st.subheader("📊 Auto-Generated Visualizations")
     numeric_cols = df.select_dtypes(include=np.number).columns
     categorical_cols = df.select_dtypes(include='object').columns
@@ -63,6 +69,8 @@ def generate_visuals(df):
         fig, ax = plt.subplots(figsize=(8, 5))
         sns.heatmap(corr, annot=True, fmt=".2f", cmap="coolwarm", ax=ax)
         st.pyplot(fig)
+        summary_output += "\n\n**Correlation Matrix Head:**\n"
+        summary_output += str(corr.head())
 
     if show_pca and len(numeric_cols) >= 2:
         st.subheader("🔬 PCA Projection (First 2 Components)")
@@ -73,6 +81,8 @@ def generate_visuals(df):
         ax.set_xlabel("PC1")
         ax.set_ylabel("PC2")
         st.pyplot(fig)
+        summary_output += "\n\n**PCA Variance Explained:**\n"
+        summary_output += str(pca.explained_variance_ratio_)
 
     if show_cluster and len(numeric_cols) >= 2:
         st.subheader("🧭 KMeans Clustering (k=3)")
@@ -82,6 +92,8 @@ def generate_visuals(df):
         fig, ax = plt.subplots()
         sns.scatterplot(x=df[numeric_cols].iloc[:, 0], y=df[numeric_cols].iloc[:, 1], hue=clusters, palette="viridis", ax=ax)
         st.pyplot(fig)
+        summary_output += "\n\n**Cluster Centers:**\n"
+        summary_output += str(km.cluster_centers_)
 
     if show_tfidf:
         text_cols = df.select_dtypes(include='object').columns
@@ -95,6 +107,7 @@ def generate_visuals(df):
                 scores = tfidf.sum(axis=0).A1
                 top_terms = pd.Series(scores, index=terms).sort_values(ascending=False)
                 st.bar_chart(top_terms)
+                summary_output += f"\n\n**TF-IDF for {col}:**\n{top_terms.to_string()}"
 
 if uploaded_file and st.button("Analyze"):
     try:
@@ -105,6 +118,9 @@ if uploaded_file and st.button("Analyze"):
         st.subheader("📑 Column Summary")
         column_summary = describe_columns(df)
         st.text(column_summary)
+
+        summary_output += f"# SAMI Analyzer Report\n\n**Rows:** {df.shape[0]} | **Columns:** {df.shape[1]}\n"
+        summary_output += f"\n## Column Summary\n{column_summary}"
 
         generate_visuals(df)
 
@@ -124,7 +140,17 @@ if uploaded_file and st.button("Analyze"):
                 ]
             )
             st.subheader("💬 GPT Insight")
-            st.markdown(response.choices[0].message.content)
+            gpt_reply = response.choices[0].message.content
+            st.markdown(gpt_reply)
+            summary_output += f"\n\n## GPT Insight\n{gpt_reply}"
+
+        if show_export:
+            st.subheader("📥 Download Report")
+            buffer = BytesIO()
+            filename = f"SAMI_Report_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.md"
+            buffer.write(summary_output.encode("utf-8"))
+            buffer.seek(0)
+            st.download_button("📄 Download Markdown Report", buffer, file_name=filename, mime="text/markdown")
 
     except Exception as e:
         st.error(f"Error: {e}")
