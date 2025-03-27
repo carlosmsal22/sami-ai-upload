@@ -10,3 +10,4 @@ semopy
 wordcloud
 scikit-learn
 fpdf
+python-pptx
