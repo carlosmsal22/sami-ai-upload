@@ -1,19 +1,17 @@
-
 import streamlit as st
 from pptx import Presentation
 import os
-from openai import OpenAI
+import openai
 import matplotlib.pyplot as plt
 import numpy as np
 from io import BytesIO
 from fpdf import FPDF
 import requests
 
-st.set_page_config(page_title="Persona Generator with Avatars", layout="wide")
-st.title("🧠 Persona Generator from PowerPoint + DALL·E Avatars")
+st.set_page_config(page_title="Enhanced Persona From PPTX with Avatars", layout="wide")
+st.title("👤 Persona Generator from PowerPoint + DALL·E Avatars")
 
-import os
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 # Upload PPTX
 uploaded_file = st.file_uploader("Upload a PowerPoint (.pptx) with segmentation analysis", type=["pptx"])
@@ -27,38 +25,45 @@ def extract_text_from_pptx(file):
                 text += shape.text + "\n"
     return text.strip()
 
-def generate_gpt_response(prompt):
-    response = client.chat.completions.create(
-        model="gpt-4-turbo",
+def generate_gpt_response(prompt, role="strategist"):
+    system_msg = "You are a senior market research strategist." if role == "strategist" else "You are a creative strategist who writes persona bios."
+    response = openai.ChatCompletion.create(
+        model="gpt-4",
         messages=[
-            {"role": "system", "content": "You are a senior market research strategist."},
+            {"role": "system", "content": system_msg},
             {"role": "user", "content": prompt}
         ]
     )
     return response.choices[0].message.content.strip()
 
 def generate_dalle_image(description):
-    dalle_response = client.images.generate(
-        model="dall-e-3",
-        prompt=description,
-        size="1024x1024",
-        quality="standard",
-        n=1
-    )
-    return dalle_response.data[0].url
+    try:
+        dalle_response = openai.Image.create(
+            prompt=description,
+            n=1,
+            size="1024x1024",
+            response_format="url"
+        )
+        return dalle_response["data"][0]["url"]
+    except Exception as e:
+        st.warning(f"Failed to generate image for '{description}': {e}")
+        return None
 
+# Store memory context
 if "summary" not in st.session_state:
     st.session_state.summary = ""
 if "personas" not in st.session_state:
     st.session_state.personas = ""
-if "persona_dicts" not in st.session_state:
-    st.session_state.persona_dicts = []
 if "avatars" not in st.session_state:
     st.session_state.avatars = {}
 
+# Extract text and generate summary
 if uploaded_file and st.button("🔍 Generate Segmentation Summary"):
     ppt_text = extract_text_from_pptx(uploaded_file)
+    with st.expander("📄 Slide Text Extracted"):
+        st.text(ppt_text[:2000])
     st.info("Sending content to GPT for strategic summary...")
+
     summary_prompt = f"""You are SAMI AI, an advanced market insights engine. Analyze the following segmentation slides and produce a strategic summary. Include:
 - Segment descriptions (demographics, attitudes)
 - Key differentiators
@@ -71,51 +76,53 @@ Slides:
     st.subheader("📌 Strategic Summary")
     st.markdown(summary)
 
+# Generate Personas
 if st.session_state.summary and st.button("👥 Generate Personas"):
-    persona_prompt = f"""Based on this segmentation summary, generate 5 distinct personas. Each should include:
+    persona_prompt = f"""Based on this segmentation summary, generate 4–6 distinct personas. Each should include:
 - Name
 - Description
 - Traits
 - Pain Points
 - Motivations
-- Preferred Channels
+- Channels
 - Example Messaging
 
 Summary:
 {st.session_state.summary}"""
-    personas_raw = generate_gpt_response(persona_prompt)
-    st.session_state.personas = personas_raw
+    personas = generate_gpt_response(persona_prompt, role="persona")
+    st.session_state.personas = personas
     st.subheader("🎯 Personas")
-    st.markdown(personas_raw)
+    st.markdown(personas)
 
+# Generate Avatars
 if st.session_state.personas and st.button("🖼️ Generate Persona Avatars"):
+    st.subheader("🧠 Generating DALL·E Avatars...")
     st.session_state.avatars = {}
-    st.subheader("🖼️ Persona Avatars")
-    lines = st.session_state.personas.split('\n')
-    current_name = ""
-    for line in lines:
-        if line.startswith("Persona"):
-            current_name = line.split(":")[1].strip()
-        elif line.startswith("Description:") and current_name:
-            prompt = line.split("Description:")[1].strip()
-            try:
-                image_url = generate_dalle_image(prompt)
-                st.session_state.avatars[current_name] = image_url
-            except Exception as e:
-                st.warning(f"Could not generate image for {current_name}: {e}")
-            current_name = ""
+    persona_blocks = st.session_state.personas.split("Persona ")
+    for block in persona_blocks[1:]:
+        lines = block.strip().split("\n")
+        if not lines:
+            continue
+        name_line = lines[0].strip()
+        name = name_line.split(":")[1].strip() if ":" in name_line else name_line.strip()
+        description = ""
+        for line in lines:
+            if "Description:" in line:
+                description = line.split("Description:")[1].strip()
+                break
+        if name and description:
+            image_url = generate_dalle_image(description)
+            if image_url:
+                st.session_state.avatars[name] = image_url
 
+# Show Avatars
+if st.session_state.avatars:
+    st.subheader("🖼️ Persona Avatars")
     for name, url in st.session_state.avatars.items():
         st.markdown(f"**{name}**")
-        if url:
-            st.image(url, width=300)
-            with BytesIO() as img_buf:
-                img_buf.write(requests.get(url).content)
-                img_buf.seek(0)
-                st.download_button(f"📥 Download {name}", img_buf, file_name=f"{name}.png")
-        else:
-            st.warning(f"No image available for {name}.")
+        st.image(url, width=300)
 
+# Export to PDF
 if st.session_state.personas and st.button("📄 Download PDF Summary"):
     pdf = FPDF()
     pdf.add_page()
@@ -124,6 +131,6 @@ if st.session_state.personas and st.button("📄 Download PDF Summary"):
     pdf.ln(4)
     pdf.multi_cell(0, 5, "🎯 Personas\n" + st.session_state.personas)
     buffer = BytesIO()
-    pdf.output("persona_report.pdf")
-    with open("persona_report.pdf", "rb") as f:
-        st.download_button("📥 Download PDF", f, file_name="persona_report.pdf", mime="application/pdf")
+    pdf.output(buffer, 'F')
+    buffer.seek(0)
+    st.download_button("📥 Download PDF", buffer, file_name="persona_report.pdf", mime="application/pdf")
