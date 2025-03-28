@@ -12,7 +12,8 @@ import requests
 st.set_page_config(page_title="Persona Generator with Avatars", layout="wide")
 st.title("🧠 Persona Generator from PowerPoint + DALL·E Avatars")
 
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
+import os
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 # Upload PPTX
 uploaded_file = st.file_uploader("Upload a PowerPoint (.pptx) with segmentation analysis", type=["pptx"])
