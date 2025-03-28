@@ -3,8 +3,7 @@ import streamlit as st
 from pptx import Presentation
 import os
 from openai import OpenAI
-import matplotlib.pyplot as plt
-import numpy as np
+import requests
 from io import BytesIO
 from fpdf import FPDF
 import re
@@ -43,8 +42,6 @@ def generate_dalle_image(description):
         quality="standard",
         n=1
     )
-    return dalle_response.data[0].url
-
     return dalle_response.data[0].url
 
 if "summary" not in st.session_state:
@@ -99,7 +96,7 @@ if st.session_state.personas and st.button("🎨 Generate Persona Avatars"):
         except Exception as e:
             st.warning(f"Failed to generate image for {name}: {e}")
 
-# Display personas + images
+# Display personas + images + download
 if st.session_state.personas:
     st.subheader("🧍 Persona Cards")
     persona_blocks = re.findall(r"\*\*Name\*\*: (.*?)\n\*\*Description\*\*: (.*?)\n", st.session_state.personas)
@@ -108,6 +105,16 @@ if st.session_state.personas:
         st.markdown(f"*{desc}*")
         if name in st.session_state.persona_images:
             st.image(st.session_state.persona_images[name], width=200)
+            try:
+                img_data = requests.get(st.session_state.persona_images[name]).content
+                st.download_button(
+                    label=f"💾 Download Avatar for {name}",
+                    data=img_data,
+                    file_name=f"{name}_avatar.png",
+                    mime="image/png"
+                )
+            except:
+                st.warning(f"Could not load image for {name}.")
 
 # Step 4: Export to PDF
 if st.session_state.personas and st.button("📄 Download PDF Summary"):
