@@ -12,7 +12,8 @@ st.title("👤 Persona Generator with AI Avatars")
 st.markdown("Upload a segmentation document or paste key descriptions below.")
 
 # Load OpenAI API key
-openai.api_key = st.secrets["OPENAI_API_KEY"]
+import os
+openai.api_key = os.environ.get("OPENAI_API_KEY")
 
 # ---- TEXT INPUT ----
 prompt_input = st.text_area("Paste your segmentation text:", height=300)
