@@ -1,19 +1,20 @@
+
 import streamlit as st
 from pptx import Presentation
 import os
 from openai import OpenAI
 import matplotlib.pyplot as plt
-import pandas as pd
 import numpy as np
 from io import BytesIO
 from fpdf import FPDF
-import re
+import requests
 
-st.set_page_config(page_title="🧠 Persona From PPTX", layout="wide")
+st.set_page_config(page_title="Persona Generator with Avatars", layout="wide")
 st.title("🧠 Persona Generator from PowerPoint + DALL·E Avatars")
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
+# Upload PPTX
 uploaded_file = st.file_uploader("Upload a PowerPoint (.pptx) with segmentation analysis", type=["pptx"])
 
 def extract_text_from_pptx(file):
@@ -27,7 +28,7 @@ def extract_text_from_pptx(file):
 
 def generate_gpt_response(prompt):
     response = client.chat.completions.create(
-        model="gpt-4",
+        model="gpt-4-turbo",
         messages=[
             {"role": "system", "content": "You are a senior market research strategist."},
             {"role": "user", "content": prompt}
@@ -49,15 +50,14 @@ if "summary" not in st.session_state:
     st.session_state.summary = ""
 if "personas" not in st.session_state:
     st.session_state.personas = ""
-if "avatar_urls" not in st.session_state:
-    st.session_state.avatar_urls = {}
+if "persona_dicts" not in st.session_state:
+    st.session_state.persona_dicts = []
+if "avatars" not in st.session_state:
+    st.session_state.avatars = {}
 
 if uploaded_file and st.button("🔍 Generate Segmentation Summary"):
     ppt_text = extract_text_from_pptx(uploaded_file)
-    with st.expander("📄 Slide Text Extracted"):
-        st.text(ppt_text[:2000])
     st.info("Sending content to GPT for strategic summary...")
-
     summary_prompt = f"""You are SAMI AI, an advanced market insights engine. Analyze the following segmentation slides and produce a strategic summary. Include:
 - Segment descriptions (demographics, attitudes)
 - Key differentiators
@@ -71,58 +71,49 @@ Slides:
     st.markdown(summary)
 
 if st.session_state.summary and st.button("👥 Generate Personas"):
-    summary_text = st.session_state.summary
-    match = re.search(r'(\d+)\s+segments?', summary_text.lower())
-    num_segments = int(match.group(1)) if match else 5
+    persona_prompt = f"""Based on this segmentation summary, generate 5 distinct personas. Each should include:
+- Name
+- Description
+- Traits
+- Pain Points
+- Motivations
+- Preferred Channels
+- Example Messaging
 
-    persona_prompt = f"""You are SAMI AI, an advanced segmentation strategist.
-
-Based on the segmentation summary below, generate exactly {num_segments} distinct personas.
-
-Each persona must include:
-## Name
-## Description
-## Traits
-## Pain Points
-## Motivations
-## Preferred Channels
-## Example Messaging
-
-Each persona should be clearly separated and fully written. Do not skip any. Make the names creative but realistic.
-
-Segmentation Summary:
-{summary_text}"""
-    personas = generate_gpt_response(persona_prompt)
-    st.session_state.personas = personas
+Summary:
+{st.session_state.summary}"""
+    personas_raw = generate_gpt_response(persona_prompt)
+    st.session_state.personas = personas_raw
     st.subheader("🎯 Personas")
-    st.markdown(personas)
+    st.markdown(personas_raw)
 
-    st.session_state.avatar_urls = {}
-    for block in personas.split("## Name")[1:]:
-        name_line = block.strip().split("\n")[0]
-        description = ""
-        if "## Description" in block:
-            try:
-                description = block.split("## Description")[1].split("\n")[0].strip()
-            except:
-                continue
-        if description:
-            try:
-                image_url = generate_dalle_image(description)
-                st.session_state.avatar_urls[name_line] = image_url
-            except Exception as e:
-                st.warning(f"Failed to generate image for {name_line}: {e}")
-
-if st.session_state.avatar_urls:
+if st.session_state.personas and st.button("🖼️ Generate Persona Avatars"):
+    st.session_state.avatars = {}
     st.subheader("🖼️ Persona Avatars")
-    for name, url in st.session_state.avatar_urls.items():
-        st.image(url, caption=name)
-        st.download_button(
-            label=f"💾 Download Avatar - {name}",
-            data=BytesIO(requests.get(url).content),
-            file_name=f"{name.replace(' ', '_')}_avatar.png",
-            mime="image/png"
-        )
+    lines = st.session_state.personas.split('\n')
+    current_name = ""
+    for line in lines:
+        if line.startswith("Persona"):
+            current_name = line.split(":")[1].strip()
+        elif line.startswith("Description:") and current_name:
+            prompt = line.split("Description:")[1].strip()
+            try:
+                image_url = generate_dalle_image(prompt)
+                st.session_state.avatars[current_name] = image_url
+            except Exception as e:
+                st.warning(f"Could not generate image for {current_name}: {e}")
+            current_name = ""
+
+    for name, url in st.session_state.avatars.items():
+        st.markdown(f"**{name}**")
+        if url:
+            st.image(url, width=300)
+            with BytesIO() as img_buf:
+                img_buf.write(requests.get(url).content)
+                img_buf.seek(0)
+                st.download_button(f"📥 Download {name}", img_buf, file_name=f"{name}.png")
+        else:
+            st.warning(f"No image available for {name}.")
 
 if st.session_state.personas and st.button("📄 Download PDF Summary"):
     pdf = FPDF()
