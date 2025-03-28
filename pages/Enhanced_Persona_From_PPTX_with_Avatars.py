@@ -1,4 +1,3 @@
-
 import streamlit as st
 from pptx import Presentation
 import os
@@ -8,6 +7,7 @@ import pandas as pd
 import numpy as np
 from io import BytesIO
 from fpdf import FPDF
+import re
 
 st.set_page_config(page_title="🧠 Persona From PPTX", layout="wide")
 st.title("🧠 Persona Generator from PowerPoint + DALL·E Avatars")
@@ -71,42 +71,58 @@ Slides:
     st.markdown(summary)
 
 if st.session_state.summary and st.button("👥 Generate Personas"):
-    persona_prompt = f"""Based on this segmentation summary, generate 2-3 distinct personas. Each should include:
-- Name
-- Description
-- Traits
-- Pain Points
-- Motivations
-- Channels
-- Example Messaging
+    summary_text = st.session_state.summary
+    match = re.search(r'(\d+)\s+segments?', summary_text.lower())
+    num_segments = int(match.group(1)) if match else 5
 
-Summary:
-{st.session_state.summary}"""
+    persona_prompt = f"""You are SAMI AI, an advanced segmentation strategist.
+
+Based on the segmentation summary below, generate exactly {num_segments} distinct personas.
+
+Each persona must include:
+## Name
+## Description
+## Traits
+## Pain Points
+## Motivations
+## Preferred Channels
+## Example Messaging
+
+Each persona should be clearly separated and fully written. Do not skip any. Make the names creative but realistic.
+
+Segmentation Summary:
+{summary_text}"""
     personas = generate_gpt_response(persona_prompt)
     st.session_state.personas = personas
     st.subheader("🎯 Personas")
     st.markdown(personas)
 
-    for block in personas.split("Name:")[1:]:
+    st.session_state.avatar_urls = {}
+    for block in personas.split("## Name")[1:]:
         name_line = block.strip().split("\n")[0]
-        description = block.strip().split("Description:")[1].split("\n")[0]
-        try:
-            image_url = generate_dalle_image(description)
-            st.session_state.avatar_urls[name_line] = image_url
-        except Exception as e:
-            st.warning(f"Failed to generate image for {name_line}: {e}")
+        description = ""
+        if "## Description" in block:
+            try:
+                description = block.split("## Description")[1].split("\n")[0].strip()
+            except:
+                continue
+        if description:
+            try:
+                image_url = generate_dalle_image(description)
+                st.session_state.avatar_urls[name_line] = image_url
+            except Exception as e:
+                st.warning(f"Failed to generate image for {name_line}: {e}")
 
 if st.session_state.avatar_urls:
     st.subheader("🖼️ Persona Avatars")
     for name, url in st.session_state.avatar_urls.items():
         st.image(url, caption=name)
-        with BytesIO() as img_buffer:
-            st.download_button(
-                label=f"💾 Download Avatar - {name}",
-                data=img_buffer,
-                file_name=f"{name.replace(' ', '_')}_avatar.png",
-                mime="image/png"
-            )
+        st.download_button(
+            label=f"💾 Download Avatar - {name}",
+            data=BytesIO(requests.get(url).content),
+            file_name=f"{name.replace(' ', '_')}_avatar.png",
+            mime="image/png"
+        )
 
 if st.session_state.personas and st.button("📄 Download PDF Summary"):
     pdf = FPDF()
