@@ -8,10 +8,9 @@ import numpy as np
 from io import BytesIO
 from fpdf import FPDF
 import re
-import requests
 
-st.set_page_config(page_title="🧠 Persona Generator", layout="wide")
-st.title("🧠 Persona Generator from PowerPoint + DALL·E Avatars (Debug Mode)")
+st.set_page_config(page_title="🧠 Persona Generator with Avatars", layout="wide")
+st.title("🧠 Persona Generator from PowerPoint + DALL·E Avatars (Enhanced Debug)")
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -46,6 +45,7 @@ def generate_dalle_image(description):
     )
     return dalle_response.data[0].url
 
+# SESSION STATE INIT
 if "summary" not in st.session_state:
     st.session_state.summary = ""
 if "personas" not in st.session_state:
@@ -53,10 +53,11 @@ if "personas" not in st.session_state:
 if "avatar_urls" not in st.session_state:
     st.session_state.avatar_urls = {}
 
+# STEP 1: Generate Strategic Summary
 if uploaded_file and st.button("🔍 Generate Segmentation Summary"):
     ppt_text = extract_text_from_pptx(uploaded_file)
     with st.expander("📄 Slide Text Extracted"):
-        st.text(ppt_text[:2000])
+        st.text(ppt_text[:3000])
     st.info("Sending content to GPT for strategic summary...")
 
     summary_prompt = f"""You are SAMI AI, an advanced market insights engine. Analyze the following segmentation slides and produce a strategic summary. Include:
@@ -71,6 +72,7 @@ Slides:
     st.subheader("📌 Strategic Summary")
     st.markdown(summary)
 
+# STEP 2: Generate Personas with Avatar Image Prompts
 if st.session_state.summary and st.button("👥 Generate Personas"):
     summary_text = st.session_state.summary
     match = re.search(r'(\d+)\s+segments?', summary_text.lower())
@@ -89,9 +91,7 @@ Each persona must include:
 ## Preferred Channels
 ## Example Messaging
 
-Each persona should be clearly separated and fully written. Do not skip any. Make the names creative but realistic.
-
-Segmentation Summary:
+Summary:
 {summary_text}"""
     personas = generate_gpt_response(persona_prompt)
     st.session_state.personas = personas
@@ -99,7 +99,10 @@ Segmentation Summary:
     st.markdown(personas)
 
     st.session_state.avatar_urls = {}
-    for block in personas.split("## Name")[1:]:
+    persona_blocks = personas.split("## Name")[1:]
+    if not persona_blocks:
+        st.warning("⚠️ No persona blocks found. Please check the formatting of the GPT output.")
+    for block in persona_blocks:
         name_line = block.strip().split("\n")[0]
         description = ""
         if "## Description" in block:
@@ -109,18 +112,20 @@ Segmentation Summary:
                 continue
         if description:
             try:
-                st.write(f"🧪 Generating image for: {name_line}")
-                st.write(f"📝 Prompt: {description}")
+                st.markdown(f"🧪 Generating image for: {name_line}")
+                st.markdown(f"📝 Prompt: {description}")
                 image_url = generate_dalle_image(description)
                 st.session_state.avatar_urls[name_line] = image_url
             except Exception as e:
                 st.warning(f"⚠️ Failed to generate image for {name_line}: {e}")
 
+# STEP 3: SHOW AVATARS
 if st.session_state.avatar_urls:
     st.subheader("🖼️ Persona Avatars")
     for name, url in st.session_state.avatar_urls.items():
         st.image(url, caption=name)
 
+# STEP 4: PDF Download
 if st.session_state.personas and st.button("📄 Download PDF Summary"):
     pdf = FPDF()
     pdf.add_page()
@@ -129,6 +134,6 @@ if st.session_state.personas and st.button("📄 Download PDF Summary"):
     pdf.ln(4)
     pdf.multi_cell(0, 5, "🎯 Personas\n" + st.session_state.personas)
     buffer = BytesIO()
-    pdf.output("persona_report.pdf")
-    with open("persona_report.pdf", "rb") as f:
+    pdf.output("persona_debug.pdf")
+    with open("persona_debug.pdf", "rb") as f:
         st.download_button("📥 Download PDF", f, file_name="persona_report.pdf", mime="application/pdf")
