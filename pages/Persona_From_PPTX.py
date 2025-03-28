@@ -11,7 +11,7 @@ import re
 import requests
 
 st.set_page_config(page_title="🧠 Persona Generator", layout="wide")
-st.title("🧠 Persona Generator from PowerPoint + DALL·E Avatars")
+st.title("🧠 Persona Generator from PowerPoint + DALL·E Avatars (Debug Mode)")
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -109,10 +109,12 @@ Segmentation Summary:
                 continue
         if description:
             try:
+                st.write(f"🧪 Generating image for: {name_line}")
+                st.write(f"📝 Prompt: {description}")
                 image_url = generate_dalle_image(description)
                 st.session_state.avatar_urls[name_line] = image_url
             except Exception as e:
-                st.warning(f"Failed to generate image for {name_line}: {e}")
+                st.warning(f"⚠️ Failed to generate image for {name_line}: {e}")
 
 if st.session_state.avatar_urls:
     st.subheader("🖼️ Persona Avatars")
