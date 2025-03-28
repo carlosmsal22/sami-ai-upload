@@ -8,8 +8,8 @@ import numpy as np
 from io import BytesIO
 from fpdf import FPDF
 
-st.set_page_config(page_title="Enhanced Persona Generator from PPTX + Avatars", layout="wide")
-st.title("🧠 Persona Generator from PowerPoint + DALL·E Avatars")
+st.set_page_config(page_title="Enhanced Persona Generator from PowerPoint + Avatars", layout="wide")
+st.title("🎯 Persona Generator from PowerPoint + DALL·E Avatars")
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -25,14 +25,14 @@ def extract_text_from_pptx(file):
     return text.strip()
 
 def generate_gpt_response(prompt):
-    response = client.chat.completions.create(
+    chat = client.chat.completions.create(
         model="gpt-4",
         messages=[
             {"role": "system", "content": "You are a senior market research strategist."},
             {"role": "user", "content": prompt}
         ]
     )
-    return response.choices[0].message.content.strip()
+    return chat.choices[0].message.content.strip()
 
 def generate_dalle_image(description):
     dalle_response = client.images.generate(
@@ -48,60 +48,77 @@ if "summary" not in st.session_state:
     st.session_state.summary = ""
 if "personas" not in st.session_state:
     st.session_state.personas = ""
-if "images" not in st.session_state:
-    st.session_state.images = {}
+if "avatars" not in st.session_state:
+    st.session_state.avatars = {}
 
 if uploaded_file and st.button("🔍 Generate Segmentation Summary"):
     ppt_text = extract_text_from_pptx(uploaded_file)
-    with st.expander("📄 Slide Text Extracted"):
+    with st.expander("📄 Extracted Slide Content"):
         st.text(ppt_text[:2000])
-    st.info("Sending content to GPT for strategic summary...")
+    st.info("Sending to GPT for strategic summary...")
 
-    summary_prompt = f"""You are SAMI AI, an advanced market insights engine. Analyze the following segmentation slides and produce a strategic summary. Include:
-- Segment descriptions (demographics, attitudes)
-- Key differentiators
-- Strategic implications for acquisition, loyalty, and innovation
+    summary_prompt = f"""
+You are SAMI AI, a senior market strategist. Analyze the following slide content from a segmentation presentation and produce a strategic summary. Include:
 
-Slides:
-{ppt_text[:4000]}"""
+1. Clear overview of all segments (segment names, attitudes, demographics)
+2. Key differentiators
+3. Strategic implications for:
+   - Acquisition
+   - Loyalty
+   - Innovation
+
+Slide Text:
+{ppt_text[:4000]}
+"""
     summary = generate_gpt_response(summary_prompt)
     st.session_state.summary = summary
     st.subheader("📌 Strategic Summary")
     st.markdown(summary)
 
 if st.session_state.summary and st.button("👥 Generate Personas"):
-    persona_prompt = f"""Based on this segmentation summary, generate 5 distinct personas. Each should include:
+    persona_prompt = f"""
+Based on the segmentation summary, generate 5-6 unique personas. Each persona should include:
+
 - Name
 - Description
 - Traits
 - Pain Points
 - Motivations
-- Channels
+- Preferred Channels
 - Example Messaging
 
-Summary:
-{st.session_state.summary}"""
+Be concise, insightful, and emphasize emotional and behavioral triggers.
+
+Segmentation Summary:
+{st.session_state.summary}
+"""
     personas = generate_gpt_response(persona_prompt)
     st.session_state.personas = personas
     st.subheader("🎯 Personas")
     st.markdown(personas)
 
 if st.session_state.personas and st.button("🖼️ Generate Persona Avatars"):
-    lines = st.session_state.personas.split("\n")
-    names = [line.replace("Persona ", "").strip(":") for line in lines if line.startswith("Persona ")]
-    for name in names:
-        try:
-            avatar_prompt = f"Professional illustration of a persona named {name}, business style, realistic portrait, facing front, white background"
-            image_url = generate_dalle_image(avatar_prompt)
-            st.session_state.images[name] = image_url
-        except Exception as e:
-            st.warning(f"Failed to generate image for {name}: {e}")
+    st.session_state.avatars = {}
+    with st.spinner("Generating persona avatars..."):
+        import re
+        names = re.findall(r"Persona \d+: (.*?)\n", st.session_state.personas)
+        for name in names:
+            desc_match = re.search(rf"{name}\n\nDescription:\n(.*?)\n\nTraits:", st.session_state.personas, re.DOTALL)
+            if desc_match:
+                description = desc_match.group(1).strip()
+                prompt = f"Photorealistic professional headshot portrait of {name}, {description}. Neutral background."
+                try:
+                    url = generate_dalle_image(prompt)
+                    st.session_state.avatars[name] = url
+                except Exception as e:
+                    st.warning(f"Failed to generate image for {name} : {e}")
 
-if st.session_state.images:
+if st.session_state.avatars:
     st.subheader("🧠 Persona Avatars")
-    for name, url in st.session_state.images.items():
+    for name, url in st.session_state.avatars.items():
         st.image(url, caption=name, use_column_width=True)
 
+# Export PDF
 if st.session_state.personas and st.button("📄 Download PDF Summary"):
     pdf = FPDF()
     pdf.add_page()
@@ -110,6 +127,6 @@ if st.session_state.personas and st.button("📄 Download PDF Summary"):
     pdf.ln(4)
     pdf.multi_cell(0, 5, "🎯 Personas\n" + st.session_state.personas)
     buffer = BytesIO()
-    pdf.output(buffer)
+    pdf.output(buffer, "F")
     buffer.seek(0)
     st.download_button("📥 Download PDF", buffer, file_name="persona_report.pdf", mime="application/pdf")
