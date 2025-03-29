@@ -1,82 +1,118 @@
 
 import streamlit as st
+from pptx import Presentation
 import os
-from PIL import Image
+from openai import OpenAI
 import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+from io import BytesIO
 from fpdf import FPDF
 
-# === Directory Setup ===
-AVATAR_DIR = "avatars"
-CARD_DIR = "cards"
-CHART_DIR = "charts"
-PDF_DIR = "pdfs"
+st.set_page_config(page_title="Enhanced PPTX Persona Generator", layout="wide")
+st.title("📊 Enhanced Persona Generator from PowerPoint")
 
-for folder in [AVATAR_DIR, CARD_DIR, CHART_DIR, PDF_DIR]:
-    os.makedirs(folder, exist_ok=True)
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# === Style Selector ===
-avatar_style = st.selectbox(
-    "Choose Avatar Style",
-    ["photo-realistic", "mid-century modern", "cartoon", "flat illustration"]
-)
+# Upload PPTX
+uploaded_file = st.file_uploader("Upload a PowerPoint (.pptx) with segmentation analysis", type=["pptx"])
 
-# === Sample Persona Data (for demo) ===
-personas = [
-    {"name": "Simon the Solution Seeker", "description": "tech-savvy urbanite who outsources cleaning and prefers modern, branded solutions."},
-    {"name": "Natalie the Neat Freak", "description": "perfectionist who loves a spotless home and invests in premium cleaning tools."}
-]
+def extract_text_from_pptx(file):
+    prs = Presentation(file)
+    text = ""
+    for slide in prs.slides:
+        for shape in slide.shapes:
+            if hasattr(shape, "text"):
+                text += shape.text + "\n"
+    return text.strip()
 
-# === Simulated Avatar + Radar Chart Generation ===
-for persona in personas:
-    name = persona["name"].replace(" ", "_")
-    
-    # === Avatar Simulation ===
-    avatar_img = Image.new("RGB", (300, 300), color=(180, 200, 255))
-    avatar_path = os.path.join(AVATAR_DIR, f"{name}_avatar.png")
-    avatar_img.save(avatar_path)
-    st.image(avatar_path, caption=f"{persona['name']}", use_column_width=True)
-    
-    # === Radar Chart Simulation ===
-    traits = ["Tech-savvy", "Cleanliness", "Brand Loyal", "Budget-Conscious"]
-    scores = [4, 3, 5, 2] if "Simon" in name else [2, 5, 4, 3]
-    angles = [n / float(len(traits)) * 2 * 3.14159 for n in range(len(traits))]
-    scores += scores[:1]
+def generate_gpt_response(prompt):
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[
+            {"role": "system", "content": "You are a senior market research strategist."},
+            {"role": "user", "content": prompt}
+        ]
+    )
+    return response.choices[0].message.content.strip()
+
+# Store memory context
+if "summary" not in st.session_state:
+    st.session_state.summary = ""
+if "personas" not in st.session_state:
+    st.session_state.personas = ""
+
+# Extract text and generate summary
+if uploaded_file and st.button("🔍 Generate Segmentation Summary"):
+    ppt_text = extract_text_from_pptx(uploaded_file)
+    with st.expander("📄 Slide Text Extracted"):
+        st.text(ppt_text[:2000])
+    st.info("Sending content to GPT for strategic summary...")
+
+    summary_prompt = f"""You are SAMI AI, an advanced market insights engine. Analyze the following segmentation slides and produce a strategic summary. Include:
+- Segment descriptions (demographics, attitudes)
+- Key differentiators
+- Strategic implications for acquisition, loyalty, and innovation
+
+Slides:
+{ppt_text[:4000]}"""
+    summary = generate_gpt_response(summary_prompt)
+    st.session_state.summary = summary
+    st.subheader("📌 Strategic Summary")
+    st.markdown(summary)
+
+# Generate Personas
+if st.session_state.summary and st.button("👥 Generate Personas"):
+    persona_prompt = f"""Based on this segmentation summary, generate 2-3 distinct personas. Each should include:
+- Name
+- Description
+- Traits
+- Pain Points
+- Motivations
+- Channels
+- Example Messaging
+
+Summary:
+{st.session_state.summary}"""
+    personas = generate_gpt_response(persona_prompt)
+    st.session_state.personas = personas
+    st.subheader("🎯 Personas")
+    st.markdown(personas)
+
+# Radar Visualization
+if st.session_state.personas and st.button("📈 Visualize Personas"):
+    st.subheader("📊 Persona Trait Radar Chart (Mock Example)")
+    labels = ['Tech-savvy', 'Budget-conscious', 'Brand loyal', 'Innovator', 'Eco-conscious']
+    traits = {
+        'Explorer Emma': [5, 2, 4, 5, 3],
+        'Saver Sam': [2, 5, 3, 2, 4],
+        'Loyal Leo': [3, 3, 5, 2, 3]
+    }
+
+    angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False).tolist()
     angles += angles[:1]
 
-    fig, ax = plt.subplots(subplot_kw=dict(polar=True))
-    ax.plot(angles, scores, linewidth=2)
-    ax.fill(angles, scores, alpha=0.25)
+    fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
+    for persona, values in traits.items():
+        values += values[:1]
+        ax.plot(angles, values, label=persona)
+        ax.fill(angles, values, alpha=0.1)
+
     ax.set_yticklabels([])
     ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(traits)
-    
-    chart_path = os.path.join(CHART_DIR, f"{name}_radar.png")
-    plt.savefig(chart_path, bbox_inches='tight')
-    st.image(chart_path, caption="Trait Radar Chart")
-    plt.close()
+    ax.set_xticklabels(labels)
+    ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1))
+    st.pyplot(fig)
 
-    # === Persona Card Composition ===
-    avatar = Image.open(avatar_path)
-    chart = Image.open(chart_path)
-    card = Image.new("RGB", (avatar.width, avatar.height + chart.height))
-    card.paste(avatar, (0, 0))
-    card.paste(chart, (0, avatar.height))
-    
-    card_path = os.path.join(CARD_DIR, f"{name}_card.png")
-    card.save(card_path)
-
-# === PDF Summary Generation ===
-class PDF(FPDF):
-    def header(self):
-        self.set_font("Helvetica", "B", 16)
-        self.cell(0, 10, "Persona Summary", ln=True, align="C")
-
-pdf = PDF()
-pdf.add_page()
-pdf.set_font("Helvetica", size=12)
-for persona in personas:
-    pdf.multi_cell(0, 10, f"{persona['name']}\n{persona['description']}\n\n")
-
-pdf_path = os.path.join(PDF_DIR, "persona_summary.pdf")
-pdf.output(pdf_path)
-st.success("All outputs saved successfully!")
+# Export to PDF
+if st.session_state.personas and st.button("📄 Download PDF Summary"):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=10)
+    pdf.multi_cell(0, 5, "📌 Strategic Summary\n" + st.session_state.summary)
+    pdf.ln(4)
+    pdf.multi_cell(0, 5, "🎯 Personas\n" + st.session_state.personas)
+    buffer = BytesIO()
+    pdf.output(buffer)
+    buffer.seek(0)
+    st.download_button("📥 Download PDF", buffer, file_name="persona_report.pdf", mime="application/pdf")
