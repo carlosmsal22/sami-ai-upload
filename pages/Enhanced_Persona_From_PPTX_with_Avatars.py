@@ -1,24 +1,16 @@
-
 import streamlit as st
 from pptx import Presentation
 import os
 from openai import OpenAI
-import matplotlib.pyplot as plt
-import pandas as pd
-import numpy as np
 from io import BytesIO
 from fpdf import FPDF
+import requests
 
-st.set_page_config(page_title="Enhanced Persona From PPTX with Avatars", layout="wide")
-st.title("🧠 Persona Generator from PowerPoint + DALL·E Avatars")
+st.set_page_config(page_title="Persona Generator from PowerPoint + DALL·E Avatars (Enhanced Debug)", layout="wide")
+st.title("🤖 Persona Generator from PowerPoint + DALL·E Avatars (Enhanced Debug)")
 
-# Debug: Show environment check
-st.markdown("🔍 Debug Mode: DALL·E + GPT Enhanced")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Load OpenAI key from environment variable
-client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-
-# Upload PPTX file
 uploaded_file = st.file_uploader("Upload a PowerPoint (.pptx) with segmentation analysis", type=["pptx"])
 
 def extract_text_from_pptx(file):
@@ -50,99 +42,81 @@ def generate_dalle_image(description):
     )
     return dalle_response.data[0].url
 
-# Session storage
 if "summary" not in st.session_state:
     st.session_state.summary = ""
 if "personas" not in st.session_state:
-    st.session_state.personas = ""
-if "persona_blocks" not in st.session_state:
-    st.session_state.persona_blocks = []
+    st.session_state.personas = []
+if "avatar_urls" not in st.session_state:
+    st.session_state.avatar_urls = {}
 
-# Generate segmentation summary
 if uploaded_file and st.button("🔍 Generate Segmentation Summary"):
     ppt_text = extract_text_from_pptx(uploaded_file)
-    with st.expander("📄 Slide Text Extracted"):
-        st.text(ppt_text[:2000])
+    st.text_area("🧾 Extracted Slide Text (Truncated)", ppt_text[:2000], height=200)
     st.info("Sending content to GPT for strategic summary...")
-    summary_prompt = (
-        "You are SAMI AI, an advanced market insights engine. Analyze the following segmentation slides and "
-        "produce a strategic summary. Include:
-"
-        "- Segment descriptions (demographics, attitudes)
-"
-        "- Key differentiators
-"
-        "- Strategic implications for acquisition, loyalty, and innovation
+    prompt = f"""You are SAMI AI, an advanced market insights engine. Analyze the following segmentation slides and produce a strategic summary. Include:
+- Segment descriptions (demographics, attitudes)
+- Key differentiators
+- Strategic implications for acquisition, loyalty, and innovation
 
-"
-        f"Slides:
-{ppt_text[:4000]}"
-    )
-    summary = generate_gpt_response(summary_prompt)
-    st.session_state.summary = summary
-    st.subheader("📌 Strategic Summary")
-    st.markdown(summary)
+Slides:
+{ppt_text[:4000]}"""
+    st.session_state.summary = generate_gpt_response(prompt)
+    st.markdown("### 📌 Strategic Summary")
+    st.markdown(st.session_state.summary)
 
-# Generate personas
 if st.session_state.summary and st.button("👥 Generate Personas"):
-    persona_prompt = (
-        "Based on this segmentation summary, generate 5 distinct personas. Each should include:
-"
-        "- Name
-"
-        "- Description
-"
-        "- Traits
-"
-        "- Pain Points
-"
-        "- Motivations
-"
-        "- Preferred Channels
-"
-        "- Example Messaging
+    persona_prompt = f"""Based on this segmentation summary, generate 5 distinct personas. Each should include:
+- Name
+- Description
+- Traits
+- Pain Points
+- Motivations
+- Preferred Channels
+- Example Messaging
 
-"
-        f"Summary:
-{st.session_state.summary}"
-    )
-    personas = generate_gpt_response(persona_prompt)
-    st.session_state.personas = personas
-    st.subheader("🎯 Personas")
-    st.markdown(personas)
+Summary:
+{st.session_state.summary}"""
+    raw_personas = generate_gpt_response(persona_prompt)
+    personas = raw_personas.split("Persona ")[1:]
+    structured_personas = ["Persona " + p.strip() for p in personas if p.strip()]
+    st.session_state.personas = structured_personas
+    st.markdown("## 🎯 Personas")
+    for p in structured_personas:
+        st.markdown(p)
 
-    # Parse into name + block
-    blocks = personas.split("Persona ")
-    parsed = []
-    for block in blocks:
-        if ":" in block:
-            name = block.split(":")[0].strip()
-            desc = block.split("Description:")[1].split("\n")[0].strip() if "Description:" in block else ""
-            parsed.append((name, desc))
-    st.session_state.persona_blocks = parsed
-
-# Generate avatars
-if st.session_state.persona_blocks and st.button("🖼️ Generate Persona Avatars"):
-    st.subheader("🖼️ Persona Avatars")
-    for name, desc in st.session_state.persona_blocks:
+if st.session_state.personas and st.button("🖼 Generate Persona Avatars"):
+    st.session_state.avatar_urls = {}
+    for persona in st.session_state.personas:
+        lines = persona.split("\n")
+        name = next((line for line in lines if line.lower().startswith("name")), "Unknown")
+        name_value = name.split(":", 1)[-1].strip() if ":" in name else name
+        desc = next((line for line in lines if line.lower().startswith("description")), "An individual")
         try:
-            with st.spinner(f"Generating image for {name}..."):
-                image_prompt = f"Professional digital portrait of {name}, representing traits of the persona. Style: realistic, clean background, business attire."
-                url = generate_dalle_image(image_prompt)
-                st.image(url, caption=name, use_container_width=True)
-                st.success(f"✅ Avatar generated for {name}")
+            url = generate_dalle_image(desc)
+            st.session_state.avatar_urls[name_value] = url
         except Exception as e:
-            st.error(f"❌ Failed to generate image for {name}: {e}")
+            st.warning(f"Failed to generate image for {name_value}: {e}")
 
-# Export to PDF
-if st.session_state.personas and st.button("📄 Download PDF Summary"):
+if st.session_state.avatar_urls:
+    st.markdown("## 🧠 Persona Avatars")
+    for name, url in st.session_state.avatar_urls.items():
+        st.image(url, caption=name, use_column_width=True)
+
+# Optional download (disabled if encoding fails)
+if st.session_state.personas and st.button("📥 Download PDF Summary"):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=10)
-    pdf.multi_cell(0, 5, "📌 Strategic Summary\n" + st.session_state.summary)
-    pdf.ln(4)
-    pdf.multi_cell(0, 5, "🎯 Personas\n" + st.session_state.personas)
-    buffer = BytesIO()
-    pdf.output(buffer, 'F')
-    buffer.seek(0)
-    st.download_button("📥 Download PDF", buffer, file_name="persona_report.pdf", mime="application/pdf")
+    try:
+        pdf.multi_cell(0, 5, "📌 Strategic Summary\n" + st.session_state.summary.encode('latin1', 'replace').decode('latin1'))
+        pdf.ln(4)
+        for p in st.session_state.personas:
+            text = p.encode('latin1', 'replace').decode('latin1')
+            pdf.multi_cell(0, 5, text)
+            pdf.ln(2)
+        buffer = BytesIO()
+        pdf.output(buffer)
+        buffer.seek(0)
+        st.download_button("⬇️ Download PDF", buffer, file_name="persona_debug.pdf", mime="application/pdf")
+    except Exception as e:
+        st.error(f"Error generating PDF: {e}")
