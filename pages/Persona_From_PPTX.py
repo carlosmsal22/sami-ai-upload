@@ -34,9 +34,6 @@ def generate_gpt_response(prompt):
     return response.choices[0].message.content.strip()
 
 def generate_dalle_image(description):
-    st.write(f"👀 Description: {description}")
-st.write(f"🧠 Final Prompt to DALL·E: {safe_prompt}")
-
     dalle_response = client.images.generate(
         model="dall-e-3",
         prompt=description,
@@ -107,7 +104,6 @@ Segmentation Summary:
     st.markdown(personas)
 
 # Step 3: Generate Avatars (AFTER personas are shown)
-# Step 3: Generate Avatars (AFTER personas are shown)
 if st.session_state.persona_blocks and st.button("🎨 Generate Avatars"):
     st.session_state.avatar_urls = {}
 
@@ -120,23 +116,14 @@ if st.session_state.persona_blocks and st.button("🎨 Generate Avatars"):
                 description = block.split("## Description")[1].split("\n")[0].strip()
             except:
                 continue
-
-        # Build safe, enhanced prompt
-        if not description or len(description.strip()) < 15:
-            safe_prompt = "Realistic business portrait of a professional adult with a clean background and confident expression"
-        else:
-            safe_prompt = f"Realistic professional portrait of a person described as: {description}"
-
-        try:
-            st.write(f"🧠 Prompt sent to DALL·E for {name}: `{safe_prompt}`")
-            image_url = generate_dalle_image(safe_prompt)
-            st.session_state.avatar_urls[name] = image_url
-            st.success(f"✅ Avatar generated for: {name}")
-        except Exception as e:
-            st.error(f"❌ Error generating avatar for {name}: {e}")
-            # Optional fallback placeholder
-            st.session_state.avatar_urls[name] = "https://via.placeholder.com/256x256.png?text=No+Image"
-
+        if description:
+            try:
+                st.write(f"🧪 Generating avatar for: {name}")
+                image_url = generate_dalle_image(description)
+                st.session_state.avatar_urls[name] = image_url
+                st.success(f"✅ Avatar generated for: {name}")
+            except Exception as e:
+                st.error(f"❌ Error generating avatar for {name}: {e}")
 
 # Step 4: Display Avatars with Download Buttons
 if st.session_state.avatar_urls:
