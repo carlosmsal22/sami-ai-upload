@@ -12,3 +12,4 @@ scikit-learn
 fpdf
 python-pptx
 tabulate
+plotly
