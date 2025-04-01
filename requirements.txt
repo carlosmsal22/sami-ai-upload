@@ -11,3 +11,4 @@ wordcloud
 scikit-learn
 fpdf
 python-pptx
+tabulate
