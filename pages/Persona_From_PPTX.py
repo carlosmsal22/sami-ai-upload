@@ -34,6 +34,8 @@ def generate_gpt_response(prompt):
     return response.choices[0].message.content.strip()
 
 def generate_dalle_image(description):
+    st.write(f"👀 Description: {description}")
+st.write(f"🧠 Final Prompt to DALL·E: {safe_prompt}")
     dalle_response = client.images.generate(
         model="dall-e-3",
         prompt=description,
