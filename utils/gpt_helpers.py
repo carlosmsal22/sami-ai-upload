@@ -1,24 +1,26 @@
-import os
-import pandas as pd
-from openai import OpenAI
-from tabulate import tabulate
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+def summarize_comparisons(df):
+    import openai
+    from tabulate import tabulate
 
-def generate_gpt_summary(df: pd.DataFrame) -> str:
-    preview = tabulate(df.head(30), headers='keys', tablefmt='pipe', showindex=False)
-    prompt = f"""You are an expert in survey data analysis.
-Below is a cross-tabulated table showing survey results by group.
-Please summarize the most important differences between the groups.
+    try:
+        openai.api_key = os.getenv("OPENAI_API_KEY")
 
-{preview}
+        tabulated_data = tabulate(df.head(30).fillna(""), headers="keys", tablefmt="pipe", showindex=False)
+        prompt = f"""
+Analyze the following crosstab results. Identify the biggest differences between segments for each question. 
+Summarize rows where the percentage spread between segments is high (e.g. >15%).
+Present key behavioral insights and suggest implications for research strategy.
 
-Be concise and analytical in your response."""
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": "You are a market research analyst."},
-            {"role": "user", "content": prompt}
-        ]
-    )
-    return response.choices[0].message.content.strip()
+{tabulated_data}
+"""
+
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.4,
+            max_tokens=600
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"Error generating GPT summary: {e}"
