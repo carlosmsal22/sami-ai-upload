@@ -124,39 +124,23 @@ if st.session_state.avatar_urls:
 from fpdf import FPDF
 from io import BytesIO
 
-# Step 5: PDF Summary Export (No Images)
 def clean_text(text):
     if isinstance(text, str):
         return text.encode("latin-1", "ignore").decode("latin-1")
     return text
 
-if st.session_state.personas and st.button("📄 Download PDF Summary (Text Only)"):
+if st.session_state.personas and st.button("📄 Download PDF Summary"):
     pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
     pdf.set_font("Arial", size=10)
-
-    summary_text = clean_text("📌 Strategic Summary\n" + st.session_state.summary)
-    pdf.multi_cell(0, 5, summary_text)
-    pdf.ln(6)
-
-    for block in st.session_state.persona_blocks:
-        lines = block.strip().split("\n")
-        name = lines[0].strip()
-        pdf.set_font("Arial", style='B', size=11)
-        pdf.cell(0, 10, clean_text(name), ln=True)
-        pdf.set_font("Arial", size=10)
-        persona_text = clean_text("\n".join(lines[1:]))
-        pdf.multi_cell(0, 5, persona_text)
-        pdf.ln(4)
-
-    # ✅ FIXED HERE — convert to bytes before writing
-    pdf_bytes = pdf.output(dest='S').encode('latin-1')
-    pdf_buffer = BytesIO(pdf_bytes)
-
-    st.download_button(
-        label="📥 Download PDF Summary (No Images)",
-        data=pdf_buffer,
-        file_name="persona_report.pdf",
-        mime="application/pdf"
-    )
+    
+    summary_text = "📌 Strategic Summary\n" + st.session_state.summary
+    personas_text = "🎯 Personas\n" + st.session_state.personas
+    
+    pdf.multi_cell(0, 5, clean_text(summary_text))
+    pdf.ln(4)
+    pdf.multi_cell(0, 5, clean_text(personas_text))
+    
+    pdf.output("persona_report.pdf")
+    with open("persona_report.pdf", "rb") as f:
+        st.download_button("📥 Download PDF", f, file_name="persona_report.pdf", mime="application/pdf")
