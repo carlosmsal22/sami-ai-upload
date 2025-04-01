@@ -113,7 +113,5 @@ if st.session_state.personas and st.button("📄 Download PDF Summary"):
     pdf.ln(4)
     pdf.multi_cell(0, 5, "Personas\n" + st.session_state.personas)
 
-    buffer = BytesIO()
-    pdf.output(buffer)
-    buffer.seek(0)
-    st.download_button("📥 Download PDF", buffer, file_name="persona_report.pdf", mime="application/pdf")
+    pdf_data = pdf.output(dest="S").encode("latin-1")
+    st.download_button("📥 Download PDF", pdf_data, file_name="persona_report.pdf", mime="application/pdf")
