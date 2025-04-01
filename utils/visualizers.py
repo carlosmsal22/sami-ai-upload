@@ -1,18 +1,19 @@
+import pandas as pd
 import matplotlib.pyplot as plt
 
-def plot_group_bars(df):
+def plot_comparison_chart(df, question_col, group_col, value_col):
     try:
-        cols = df.columns[1:]
-        x = df.iloc[:, 0]
-        fig, ax = plt.subplots(figsize=(10, 5))
-        for col in cols:
-            ax.plot(x, df[col], marker='o', label=col)
-        ax.set_title("Group Differences")
-        ax.set_xlabel("Questions")
-        ax.set_ylabel("Values")
-        ax.legend()
-        plt.xticks(rotation=45, ha='right')
+        df = df[[question_col, group_col, value_col]].dropna()
+        df[group_col] = df[group_col].astype(str)
+        df[question_col] = df[question_col].astype(str)
+        df[value_col] = pd.to_numeric(df[value_col], errors="coerce")
+        pivot_df = df.pivot(index=question_col, columns=group_col, values=value_col)
+
+        ax = pivot_df.plot(kind="bar", figsize=(10, 5))
+        ax.set_ylabel("Value")
+        ax.set_title("Group Comparison Chart")
+        plt.xticks(rotation=45, ha="right")
         plt.tight_layout()
-        return fig
+        return ax.get_figure()
     except Exception as e:
-        raise RuntimeError(f"Error generating chart: {str(e)}")
+        raise RuntimeError(f"Error generating chart: {e}")
