@@ -46,6 +46,7 @@ def generate_dalle_image(description):
     )
     return dalle_response.data[0].url
 
+# Session State Initialization
 if "summary" not in st.session_state:
     st.session_state.summary = ""
 if "personas" not in st.session_state:
@@ -53,6 +54,7 @@ if "personas" not in st.session_state:
 if "avatar_urls" not in st.session_state:
     st.session_state.avatar_urls = {}
 
+# Step 1: Extract and summarize
 if uploaded_file and st.button("🔍 Generate Segmentation Summary"):
     ppt_text = extract_text_from_pptx(uploaded_file)
     with st.expander("📄 Slide Text Extracted"):
@@ -71,6 +73,7 @@ Slides:
     st.subheader("📌 Strategic Summary")
     st.markdown(summary)
 
+# Step 2: Generate Personas and Avatars
 if st.session_state.summary and st.button("👥 Generate Personas"):
     summary_text = st.session_state.summary
     match = re.search(r'(\d+)\s+segments?', summary_text.lower())
@@ -116,14 +119,13 @@ Segmentation Summary:
             except Exception as e:
                 st.warning(f"⚠️ Failed to generate image for {name_line}: {e}")
 
+# Step 3: Display Avatars
 if st.session_state.avatar_urls:
     st.subheader("🖼️ Persona Avatars")
     for name, url in st.session_state.avatar_urls.items():
         st.image(url, caption=name)
 
-from fpdf import FPDF
-from io import BytesIO
-
+# Step 4: PDF Export Section
 def clean_text(text):
     if isinstance(text, str):
         return text.encode("latin-1", "ignore").decode("latin-1")
@@ -131,16 +133,52 @@ def clean_text(text):
 
 if st.session_state.personas and st.button("📄 Download PDF Summary"):
     pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
     pdf.set_font("Arial", size=10)
-    
-    summary_text = "📌 Strategic Summary\n" + st.session_state.summary
-    personas_text = "🎯 Personas\n" + st.session_state.personas
-    
-    pdf.multi_cell(0, 5, clean_text(summary_text))
-    pdf.ln(4)
-    pdf.multi_cell(0, 5, clean_text(personas_text))
-    
-    pdf.output("persona_report.pdf")
-    with open("persona_report.pdf", "rb") as f:
-        st.download_button("📥 Download PDF", f, file_name="persona_report.pdf", mime="application/pdf")
+
+    # Summary first
+    summary_text = clean_text("📌 Strategic Summary\n" + st.session_state.summary)
+    pdf.multi_cell(0, 5, summary_text)
+    pdf.ln(6)
+
+    # Then each persona block + avatar
+    pdf.set_font("Arial", size=10)
+    persona_blocks = st.session_state.personas.split("## Name")[1:]
+
+    for block in persona_blocks:
+        lines = block.strip().split("\n")
+        name_line = lines[0].strip()
+        pdf.set_font("Arial", style='B', size=11)
+        pdf.cell(0, 10, clean_text(name_line), ln=True)
+        pdf.set_font("Arial", size=10)
+
+        # Insert avatar
+        avatar_url = st.session_state.avatar_urls.get(name_line)
+        if avatar_url:
+            try:
+                response = requests.get(avatar_url)
+                if response.status_code == 200:
+                    with open("temp_avatar.jpg", "wb") as f:
+                        f.write(response.content)
+                    pdf.image("temp_avatar.jpg", w=40, h=40)
+                    pdf.ln(2)
+            except Exception as e:
+                st.warning(f"Image failed to load for {name_line}: {e}")
+
+        # Add persona text (cleaned)
+        persona_text = clean_text("\n".join(lines[1:]))
+        pdf.multi_cell(0, 5, persona_text)
+        pdf.ln(4)
+
+    # Output to memory
+    pdf_buffer = BytesIO()
+    pdf.output(pdf_buffer)
+    pdf_buffer.seek(0)
+
+    st.download_button(
+        label="📥 Download PDF",
+        data=pdf_buffer,
+        file_name="persona_report.pdf",
+        mime="application/pdf"
+    )
