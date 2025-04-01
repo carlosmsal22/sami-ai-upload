@@ -43,11 +43,13 @@ if uploaded_file:
 
     st.markdown("---")
     st.subheader("🧠 GPT Insight Summary")
-    if st.button("Generate Executive Summary with GPT"):
-        with st.spinner("Analyzing and summarizing differences across segments..."):
-            try:
-                summary = summarize_crosstabs(df, questions, groups)
-                st.markdown("### 📝 Summary of Key Insights")
-                st.markdown(summary)
-            except Exception as e:
-                st.error(f"❌ GPT Summary failed: {e}")
+    if st.button("Generate GPT Summary"):
+    st.subheader("🧠 GPT Insights Summary")
+
+    try:
+        with st.spinner("Sending to GPT..."):
+            insights = summarize_crosstabs(df)
+            for line in insights:
+                st.markdown(f"• {line}")
+    except Exception as e:
+        st.error(f"GPT summarization failed: {e}")
