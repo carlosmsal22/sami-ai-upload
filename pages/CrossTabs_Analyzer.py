@@ -1,55 +1,29 @@
 import streamlit as st
 import pandas as pd
-import openai
-import io
-import base64
-import matplotlib.pyplot as plt
-import seaborn as sns
+from utils.gpt_helpers import generate_gpt_summary
 
-from utils.gpt_helpers import summarize_crosstabs
-from utils.parsers import parse_crosstab_file
+st.set_page_config(page_title="📊 CrossTabs Analyzer", layout="wide")
+st.title("📊 CrossTabs Analyzer + GPT Summary")
+st.markdown("Upload a cross-tabulated Excel file to generate group-wise GPT insights.")
 
-st.set_page_config(page_title="📊 Cross-Tabs Analyzer + GPT Insight Summarizer", layout="wide")
-st.title("📊 Cross-Tabs Analyzer + GPT Insight Summarizer")
-
-uploaded_file = st.file_uploader("Upload a cross-tabulated Excel or CSV file", type=["xlsx", "xls", "csv"])
+uploaded_file = st.file_uploader("Upload Excel CrossTab", type=["xlsx", "xls"])
 
 if uploaded_file:
-    # Parse the file structure
-    with st.spinner("Parsing file and detecting headers..."):
-        try:
-            df, questions, groups = parse_crosstab_file(uploaded_file)
-            st.success("✅ File parsed successfully")
-        except Exception as e:
-            st.error(f"❌ Error parsing file: {e}")
-            st.stop()
-
-    st.subheader("🧾 Preview of Parsed Cross-Tab Table")
-    st.dataframe(df.head(50), use_container_width=True)
-
-    st.markdown("---")
-    st.subheader("📈 Visualize Group Comparisons")
-    selected_question = st.selectbox("Select a question to visualize", questions)
-
-    if selected_question:
-        fig, ax = plt.subplots()
-        sub_df = df[df['Question'] == selected_question].copy()
-        sub_df.set_index("Group", inplace=True)
-        sub_df.T.plot(kind="bar", ax=ax)
-        ax.set_title(f"{selected_question} – Group Comparison")
-        ax.set_ylabel("% Respondents")
-        ax.legend(title="Groups")
-        st.pyplot(fig)
-
-    st.markdown("---")
-    st.subheader("🧠 GPT Insight Summary")
-    if st.button("Generate GPT Summary"):
-    st.subheader("🧠 GPT Insights Summary")
-
     try:
-        with st.spinner("Sending to GPT..."):
-            insights = summarize_crosstabs(df)
-            for line in insights:
-                st.markdown(f"• {line}")
+        st.info("Reading Excel...")
+        df = pd.read_excel(uploaded_file, header=[0, 1])
+        st.success("File loaded successfully!")
+        st.dataframe(df)
+
+        if st.button("🧠 Generate GPT Insights"):
+            st.subheader("🧠 GPT Insights Summary")
+            sample = df.head(5).iloc[:, :5].to_string()
+            prompt = f"""You are a market research analyst. Interpret this cross-tabulated table and summarize key group differences and insights:\n{sample}"""
+            summary = generate_gpt_summary(prompt)
+            st.markdown(summary)
+
+            with open("outputs/summary.txt", "w", encoding="utf-8") as f:
+                f.write(summary)
+            st.success("Summary saved to outputs/summary.txt")
     except Exception as e:
-        st.error(f"GPT summarization failed: {e}")
+        st.error(f"❌ Error parsing file: {e}")
