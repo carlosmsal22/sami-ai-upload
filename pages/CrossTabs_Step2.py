@@ -1,37 +1,29 @@
-import streamlit as st  
-import pandas as pd  
-import plotly.express as px  
-from utils.parsers import parse_crosstab_file  
-from utils.gpt_helpers import summarize_comparisons  
 
-st.set_page_config(page_title="📊 Cross-Tabs Analyzer – Step 2", layout="wide")  
-st.title("📊 Cross-Tabs Group Comparison Visualizer")  
+import streamlit as st
+import pandas as pd
+import plotly.express as px
+from utils.gpt_helpers import summarize_comparisons
 
-uploaded_file = st.file_uploader("Upload a cross-tab Excel file with grouped segments", type=["xlsx", "xls"])  
+st.set_page_config(page_title="📊 CrossTabs Step 2: Visualize & Compare", layout="wide")
+st.title("📊 CrossTabs Analyzer – Step 2: Compare Groups")
 
-if uploaded_file:  
-    try:  
-        df = parse_crosstab_file(uploaded_file)  
-        st.subheader("📋 Data Preview")  
-        st.dataframe(df.head(20))  
+uploaded_file = st.file_uploader("Upload Cross-Tabulated Excel File", type=["xlsx"])
+if uploaded_file:
+    try:
+        df = pd.read_excel(uploaded_file, header=[0, 1])
+        df.columns = [' '.join(col).strip() for col in df.columns.values]
+        st.dataframe(df.head())
 
-        question_col = st.selectbox("Select Question Column", df.columns)  
-        group_col = st.selectbox("Select Grouping Column", df.columns[::-1])  
+        col1 = st.selectbox("Group 1 Column", df.columns)
+        col2 = st.selectbox("Group 2 Column", df.columns)
+        if col1 != col2:
+            fig = px.bar(df, x=col1, y=col2, barmode="group", title=f"Group Comparison: {col1} vs {col2}")
+            st.plotly_chart(fig)
 
-        st.subheader("📊 Group Comparison Chart")  
-        try:  
-            fig = px.bar(df, x=group_col, y=question_col, color=group_col, barmode="group")  
-            st.plotly_chart(fig, use_container_width=True)  
-        except Exception as e:  
-            st.error(f"Error generating chart: {e}")  
+        st.subheader("🧠 GPT Insight Generator")
+        if st.button("Summarize Key Differences"):
+            summary = summarize_comparisons(df[[col1, col2]].dropna())
+            st.markdown(summary)
 
-        if st.button("🧠 GPT Insight Summary"):  
-            st.subheader("🧠 GPT Summary")  
-            try:  
-                gpt_summary = summarize_comparisons(df, group_col, question_col)  
-                st.markdown(gpt_summary)  
-            except Exception as e:  
-                st.error(f"Error during GPT summary: {e}")  
-
-    except Exception as e:  
-        st.error(f"❌ File parsing failed: {e}")
+    except Exception as e:
+        st.error(f"❌ Error: {e}")

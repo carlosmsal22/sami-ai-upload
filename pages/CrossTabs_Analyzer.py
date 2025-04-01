@@ -1,28 +1,21 @@
-import streamlit as st  
-import pandas as pd  
-from utils.parsers import parse_crosstab_file  
-from utils.gpt_helpers import summarize_gpt_slide_text  
 
-st.set_page_config(page_title="📊 Cross-Tabs Analyzer", layout="wide")  
-st.title("📊 Cross-Tabs Reader + GPT Insight Summarizer")  
+import streamlit as st
+import pandas as pd
+from utils.gpt_helpers import summarize_gpt_slide_text
 
-uploaded_file = st.file_uploader("Upload a cross-tabulated Excel file", type=["xlsx", "xls"])  
+st.set_page_config(page_title="📊 CrossTabs Analyzer", layout="wide")
+st.title("📊 CrossTabs Analyzer + GPT Summary")
 
-if uploaded_file:  
-    try:  
-        st.info("Parsing file and detecting headers...")  
-        df = parse_crosstab_file(uploaded_file)  
-        st.subheader("🔍 Preview")  
-        st.dataframe(df.head(20))  
+uploaded_file = st.file_uploader("Upload Cross-Tabulated Excel File", type=["xlsx", "xls"])
+if uploaded_file:
+    try:
+        df = pd.read_excel(uploaded_file, header=[0, 1])
+        df.columns = [' '.join(col).strip() for col in df.columns.values]
+        st.dataframe(df.head(30))
 
-        if st.button("🧠 Generate GPT Summary"):  
-            st.subheader("🧠 GPT Insights Summary")  
-            try:  
-                gpt_summary = summarize_gpt_slide_text(df.head(30).to_string(index=False))  
-                st.success("Summary complete!")  
-                st.markdown(gpt_summary)  
-            except Exception as e:  
-                st.error(f"❌ Error with GPT: {e}")  
-
-    except Exception as e:  
+        st.subheader("🧠 GPT Insights Summary")
+        with st.spinner("Analyzing table with GPT..."):
+            summary = summarize_gpt_slide_text(df.head(30))
+            st.markdown(summary)
+    except Exception as e:
         st.error(f"❌ Error parsing file: {e}")
