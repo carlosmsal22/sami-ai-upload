@@ -2,13 +2,16 @@ import streamlit as st
 from pptx import Presentation
 import os
 from openai import OpenAI
-import re
-from fpdf import FPDF
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
 from io import BytesIO
+from fpdf import FPDF
+import re
 import requests
 
 st.set_page_config(page_title="🧠 Persona Generator", layout="wide")
-st.title("🧠 Persona Generator from PowerPoint + DALL·E Avatars")
+st.title("🧠 Persona Generator from PowerPoint + DALL·E Avatars (Debug Mode)")
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -43,23 +46,19 @@ def generate_dalle_image(description):
     )
     return dalle_response.data[0].url
 
-# Session State Init
 if "summary" not in st.session_state:
     st.session_state.summary = ""
 if "personas" not in st.session_state:
     st.session_state.personas = ""
 if "avatar_urls" not in st.session_state:
     st.session_state.avatar_urls = {}
-if "persona_blocks" not in st.session_state:
-    st.session_state.persona_blocks = []
 
-# Step 1: Upload + Generate Strategic Summary
 if uploaded_file and st.button("🔍 Generate Segmentation Summary"):
     ppt_text = extract_text_from_pptx(uploaded_file)
     with st.expander("📄 Slide Text Extracted"):
         st.text(ppt_text[:2000])
-
     st.info("Sending content to GPT for strategic summary...")
+
     summary_prompt = f"""You are SAMI AI, an advanced market insights engine. Analyze the following segmentation slides and produce a strategic summary. Include:
 - Segment descriptions (demographics, attitudes)
 - Key differentiators
@@ -67,12 +66,11 @@ if uploaded_file and st.button("🔍 Generate Segmentation Summary"):
 
 Slides:
 {ppt_text[:4000]}"""
-
-    st.session_state.summary = generate_gpt_response(summary_prompt)
+    summary = generate_gpt_response(summary_prompt)
+    st.session_state.summary = summary
     st.subheader("📌 Strategic Summary")
-    st.markdown(st.session_state.summary)
+    st.markdown(summary)
 
-# Step 2: Generate Personas
 if st.session_state.summary and st.button("👥 Generate Personas"):
     summary_text = st.session_state.summary
     match = re.search(r'(\d+)\s+segments?', summary_text.lower())
@@ -95,21 +93,14 @@ Each persona should be clearly separated and fully written. Do not skip any. Mak
 
 Segmentation Summary:
 {summary_text}"""
-
     personas = generate_gpt_response(persona_prompt)
     st.session_state.personas = personas
-    st.session_state.persona_blocks = personas.split("## Name")[1:]
-
     st.subheader("🎯 Personas")
     st.markdown(personas)
 
-# Step 3: Generate Avatars (AFTER personas are shown)
-if st.session_state.persona_blocks and st.button("🎨 Generate Avatars"):
     st.session_state.avatar_urls = {}
-
-    for block in st.session_state.persona_blocks:
-        lines = block.strip().split("\n")
-        name = lines[0].strip()
+    for block in personas.split("## Name")[1:]:
+        name_line = block.strip().split("\n")[0]
         description = ""
         if "## Description" in block:
             try:
@@ -118,29 +109,20 @@ if st.session_state.persona_blocks and st.button("🎨 Generate Avatars"):
                 continue
         if description:
             try:
-                st.write(f"🧪 Generating avatar for: {name}")
+                st.write(f"🧪 Generating image for: {name_line}")
+                st.write(f"📝 Prompt: {description}")
                 image_url = generate_dalle_image(description)
-                st.session_state.avatar_urls[name] = image_url
+                st.session_state.avatar_urls[name_line] = image_url
             except Exception as e:
-                st.warning(f"⚠️ Avatar generation failed for {name}: {e}")
+                st.warning(f"⚠️ Failed to generate image for {name_line}: {e}")
 
-# Step 4: Display Avatars with Download Buttons
 if st.session_state.avatar_urls:
     st.subheader("🖼️ Persona Avatars")
     for name, url in st.session_state.avatar_urls.items():
-        try:
-            response = requests.get(url)
-            if response.status_code == 200:
-                image_bytes = BytesIO(response.content)
-                st.image(image_bytes, caption=name, width=256)
-                st.download_button(
-                    label=f"⬇️ Download {name}'s Avatar",
-                    data=image_bytes,
-                    file_name=f"{name}_avatar.jpg",
-                    mime="image/jpeg"
-                )
-        except Exception as e:
-            st.warning(f"⚠️ Could not display/download avatar for {name}: {e}")
+        st.image(url, caption=name)
+
+from fpdf import FPDF
+from io import BytesIO
 
 # Step 5: PDF Summary Export (No Images)
 def clean_text(text):
@@ -168,9 +150,9 @@ if st.session_state.personas and st.button("📄 Download PDF Summary (Text Only
         pdf.multi_cell(0, 5, persona_text)
         pdf.ln(4)
 
-    pdf_buffer = BytesIO()
-    pdf.output(pdf_buffer)
-    pdf_buffer.seek(0)
+    # ✅ FIXED HERE — convert to bytes before writing
+    pdf_bytes = pdf.output(dest='S').encode('latin-1')
+    pdf_buffer = BytesIO(pdf_bytes)
 
     st.download_button(
         label="📥 Download PDF Summary (No Images)",
