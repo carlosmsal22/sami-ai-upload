@@ -109,10 +109,10 @@ if st.session_state.personas and st.button("📄 Download PDF Summary"):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=10)
-    pdf.multi_cell(0, 5, "Strategic Summary\\n" + st.session_state.summary)
-pdf.multi_cell(0, 5, "\\n\\nPersonas\\n" + st.session_state.personas)
+    pdf.multi_cell(0, 5, "Strategic Summary\n" + st.session_state.summary)
     pdf.ln(4)
-    pdf.multi_cell(0, 5, "🎯 Personas\n" + st.session_state.personas)
+    pdf.multi_cell(0, 5, "Personas\n" + st.session_state.personas)
+
     buffer = BytesIO()
     pdf.output(buffer)
     buffer.seek(0)
