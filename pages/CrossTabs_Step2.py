@@ -1,38 +1,37 @@
-import streamlit as st
-import pandas as pd
-import plotly.express as px
-from utils.gpt_helpers import summarize_comparisons
+import streamlit as st  
+import pandas as pd  
+import plotly.express as px  
+from utils.parsers import parse_crosstab_file  
+from utils.gpt_helpers import summarize_comparisons  
 
-st.set_page_config(page_title="📊 CrossTabs Analyzer – Step 2", layout="wide")
-st.title("📊 CrossTabs Analyzer – Step 2: Insights from Group Differences")
+st.set_page_config(page_title="📊 Cross-Tabs Analyzer – Step 2", layout="wide")  
+st.title("📊 Cross-Tabs Group Comparison Visualizer")  
 
-uploaded_file = st.file_uploader("📤 Upload Cleaned Cross-Tab Excel File", type=["xlsx"])
+uploaded_file = st.file_uploader("Upload a cross-tab Excel file with grouped segments", type=["xlsx", "xls"])  
 
-if uploaded_file:
-    try:
-        df = pd.read_excel(uploaded_file)
+if uploaded_file:  
+    try:  
+        df = parse_crosstab_file(uploaded_file)  
+        st.subheader("📋 Data Preview")  
+        st.dataframe(df.head(20))  
 
-        st.subheader("📈 Group Comparison Chart")
+        question_col = st.selectbox("Select Question Column", df.columns)  
+        group_col = st.selectbox("Select Grouping Column", df.columns[::-1])  
 
-        group_cols = [col for col in df.columns if df[col].dtype in [float, int]]
-        question_col = df.columns[0]
+        st.subheader("📊 Group Comparison Chart")  
+        try:  
+            fig = px.bar(df, x=group_col, y=question_col, color=group_col, barmode="group")  
+            st.plotly_chart(fig, use_container_width=True)  
+        except Exception as e:  
+            st.error(f"Error generating chart: {e}")  
 
-        if group_cols and question_col:
-            melted_df = df.melt(id_vars=question_col, value_vars=group_cols,
-                                var_name="Group", value_name="Score")
+        if st.button("🧠 GPT Insight Summary"):  
+            st.subheader("🧠 GPT Summary")  
+            try:  
+                gpt_summary = summarize_comparisons(df, group_col, question_col)  
+                st.markdown(gpt_summary)  
+            except Exception as e:  
+                st.error(f"Error during GPT summary: {e}")  
 
-            fig = px.bar(melted_df, x=question_col, y="Score", color="Group", barmode="group",
-                         title="Group Differences Across Questions")
-            st.plotly_chart(fig, use_container_width=True)
-        else:
-            st.warning("No numeric group columns found.")
-
-        # GPT Summary Logic
-        st.subheader("🧠 GPT Insights Summary")
-        if st.button("📢 Generate Executive Summary"):
-            with st.spinner("Analyzing differences using GPT..."):
-                summary = summarize_comparisons(df)
-                st.markdown(summary)
-
-    except Exception as e:
-        st.error(f"❌ Error: {e}")
+    except Exception as e:  
+        st.error(f"❌ File parsing failed: {e}")
