@@ -1,9 +1,8 @@
 import pandas as pd
 
-def parse_crosstab_file(file):
-    df = pd.read_excel(file)
-    df = df.dropna(how="all")
-    df.columns = [str(col).strip() for col in df.columns]
-    row_headers = df.columns[0]
-    col_headers = df.columns[1:]
-    return df, row_headers, col_headers
+def parse_crosstab_file(file) -> pd.DataFrame:
+    df = pd.read_excel(file, header=0)
+    if df.columns.duplicated().any():
+        df.columns = [f"{col}_{i}" if df.columns.duplicated()[i] else col
+                      for i, col in enumerate(df.columns)]
+    return df
