@@ -1,40 +1,34 @@
 import streamlit as st
 import pandas as pd
-from utils.gpt_helpers import generate_gpt_summary
+import matplotlib.pyplot as plt
 import os
 
-st.set_page_config(page_title="📊 Cross-Tabs Analyzer", layout="wide")
-st.title("📊 Cross-Tabs Reader + GPT Insight Summarizer")
+from utils.parsers import parse_crosstab_file
+from utils.gpt_helpers import summarize_crosstab
+from utils.visualizers import plot_group_bars
 
-uploaded_file = st.file_uploader("Upload a cross-tabulated Excel file", type=["xlsx"])
+st.set_page_config(page_title="📊 CrossTabs Analyzer", layout="wide")
+st.title("📊 Cross-Tabs Analyzer + GPT Summary")
 
-def preprocess_excel(file):
-    df = pd.read_excel(file, sheet_name=0)
-    df.fillna("", inplace=True)
-    return df
+uploaded_file = st.file_uploader("Upload your cross-tab Excel file", type=["xlsx", "xls"])
 
 if uploaded_file:
-    st.success("✅ File uploaded successfully!")
-    df = preprocess_excel(uploaded_file)
-    st.dataframe(df, use_container_width=True)
+    try:
+        st.info("Parsing file and detecting headers...")
+        df, row_headers, col_headers = parse_crosstab_file(uploaded_file)
+        st.success(f"Parsed successfully with {len(df)} rows.")
 
-    if st.button("🧠 Generate GPT Summary"):
-        st.info("Sending data to GPT...")
-        gpt_prompt = f"""You are a market insights strategist. Analyze the following cross-tabulated data and extract meaningful group-level insights.
-Focus on trends, differences, and opportunities.
+        st.subheader("🔍 Data Preview")
+        st.dataframe(df.head(20))
 
-Data:
-{df.head(30).to_markdown(index=False)}"""
+        st.subheader("📊 Group Comparison Chart")
+        fig = plot_group_bars(df)
+        st.pyplot(fig)
 
-        try:
-            summary = generate_gpt_summary(gpt_prompt)
-            st.subheader("🧠 GPT Insights Summary")
-            st.markdown(summary)
-
-            # Save to text file
-            os.makedirs("outputs", exist_ok=True)
-            with open("outputs/summary.txt", "w", encoding="utf-8") as f:
-                f.write(summary)
-
-        except Exception as e:
-            st.error(f"❌ GPT generation failed: {e}")
+        st.subheader("🧠 GPT Insights Summary")
+        if st.button("🔍 Generate Insight Summary"):
+            with st.spinner("Sending data to GPT..."):
+                summary = summarize_crosstab(df)
+                st.markdown(summary)
+    except Exception as e:
+        st.error(f"❌ Error parsing file: {str(e)}")
