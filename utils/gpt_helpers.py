@@ -1,13 +1,20 @@
-import openai
+from openai import OpenAI
 import os
 
-client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-def generate_gpt_summary(prompt):
+def summarize_crosstab(df):
+    import pandas as pd
+    prompt = f"""You are a market research analyst. Analyze the following cross-tabulated data and generate key insights.
+    Provide comparisons, highlight notable group differences, and summarize key takeaways.
+
+    Data:
+    {df.head(30).to_markdown(index=False)}
+    """
     response = client.chat.completions.create(
-        model="gpt-4",
+        model="gpt-3.5-turbo",
         messages=[
-            {"role": "system", "content": "You are a senior insights analyst."},
+            {"role": "system", "content": "You are a senior research analyst."},
             {"role": "user", "content": prompt}
         ]
     )
