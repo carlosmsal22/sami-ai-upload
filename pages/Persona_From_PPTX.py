@@ -121,14 +121,26 @@ if st.session_state.avatar_urls:
     for name, url in st.session_state.avatar_urls.items():
         st.image(url, caption=name)
 
+from fpdf import FPDF
+from io import BytesIO
+
+def clean_text(text):
+    if isinstance(text, str):
+        return text.encode("latin-1", "ignore").decode("latin-1")
+    return text
+
 if st.session_state.personas and st.button("📄 Download PDF Summary"):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=10)
-    pdf.multi_cell(0, 5, "📌 Strategic Summary\n" + st.session_state.summary)
+    
+    summary_text = "📌 Strategic Summary\n" + st.session_state.summary
+    personas_text = "🎯 Personas\n" + st.session_state.personas
+    
+    pdf.multi_cell(0, 5, clean_text(summary_text))
     pdf.ln(4)
-    pdf.multi_cell(0, 5, "🎯 Personas\n" + st.session_state.personas)
-    buffer = BytesIO()
+    pdf.multi_cell(0, 5, clean_text(personas_text))
+    
     pdf.output("persona_report.pdf")
     with open("persona_report.pdf", "rb") as f:
         st.download_button("📥 Download PDF", f, file_name="persona_report.pdf", mime="application/pdf")
