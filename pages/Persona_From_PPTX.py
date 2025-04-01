@@ -11,7 +11,7 @@ import re
 import requests
 
 st.set_page_config(page_title="🧠 Persona Generator", layout="wide")
-st.title("🧠 Persona Generator from PowerPoint + DALL·E Avatars (Debug Mode)")
+st.title("🧠 Persona Generator from PowerPoint + DALL·E Avatars")
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -109,38 +109,24 @@ Segmentation Summary:
                 continue
         if description:
             try:
-                st.write(f"🧪 Generating image for: {name_line}")
-                st.write(f"📝 Prompt: {description}")
                 image_url = generate_dalle_image(description)
                 st.session_state.avatar_urls[name_line] = image_url
             except Exception as e:
-                st.warning(f"⚠️ Failed to generate image for {name_line}: {e}")
+                st.warning(f"Failed to generate image for {name_line}: {e}")
 
 if st.session_state.avatar_urls:
     st.subheader("🖼️ Persona Avatars")
     for name, url in st.session_state.avatar_urls.items():
         st.image(url, caption=name)
 
-from fpdf import FPDF
-from io import BytesIO
-
-def clean_text(text):
-    if isinstance(text, str):
-        return text.encode("latin-1", "ignore").decode("latin-1")
-    return text
-
 if st.session_state.personas and st.button("📄 Download PDF Summary"):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=10)
-    
-    summary_text = "📌 Strategic Summary\n" + st.session_state.summary
-    personas_text = "🎯 Personas\n" + st.session_state.personas
-    
-    pdf.multi_cell(0, 5, clean_text(summary_text))
+    pdf.multi_cell(0, 5, "📌 Strategic Summary\n" + st.session_state.summary)
     pdf.ln(4)
-    pdf.multi_cell(0, 5, clean_text(personas_text))
-    
+    pdf.multi_cell(0, 5, "🎯 Personas\n" + st.session_state.personas)
+    buffer = BytesIO()
     pdf.output("persona_report.pdf")
     with open("persona_report.pdf", "rb") as f:
         st.download_button("📥 Download PDF", f, file_name="persona_report.pdf", mime="application/pdf")
