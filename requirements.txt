@@ -1,3 +1,4 @@
+
 streamlit>=1.10
 openai>=1.2.4
 pandas
@@ -8,7 +9,6 @@ scikit-learn
 statsmodels
 semopy
 wordcloud
-scikit-learn
 fpdf
 python-pptx
 tabulate
