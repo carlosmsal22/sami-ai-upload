@@ -1,0 +1,13 @@
+streamlit>=1.10
+openai>=1.2.4
+pandas
+openpyxl
+matplotlib
+seaborn
+scikit-learn
+statsmodels
+semopy
+wordcloud
+scikit-learn
+fpdf
+python-pptx
