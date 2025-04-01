@@ -1,27 +1,23 @@
-import streamlit as st
-import pandas as pd
-from utils.gpt_helpers import summarize_comparisons
+# 📄 File: utils/gpt_helpers.py
+import os
+from openai import OpenAI
 
-st.set_page_config(page_title="CrossTabs Step 2 – Enhanced GPT Comparison", layout="wide")
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-st.title("📊 Cross-Tabs Analyzer – Step 2: Enhanced GPT Comparison")
+def summarize_comparisons(markdown_table, context="cross-tab results"):
+    prompt = f"""
+You are a senior market research analyst. Analyze the following {context} and provide 3–5 key insights about differences between groups. Be concise, insightful, and specific.
 
-uploaded_file = st.file_uploader("Upload your cross-tab file", type=["xlsx"])
-
-if uploaded_file:
+{markdown_table}
+"""
     try:
-        df = pd.read_excel(uploaded_file, header=None)
-        st.success("✅ File uploaded and parsed!")
-        st.dataframe(df.head(10))
-
-        if st.button("🤖 Generate Smart GPT Insights"):
-            st.subheader("🧠 GPT Enhanced Comparison Summary")
-            with st.spinner("Generating enhanced GPT summary..."):
-                try:
-                    summary = summarize_comparisons(df)
-                    st.markdown(summary)
-                except Exception as e:
-                    st.error(f"Error generating GPT summary: {str(e)}")
-
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a senior research strategist."},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        return response.choices[0].message.content.strip()
     except Exception as e:
-        st.error(f"❌ Error reading file: {str(e)}")
+        return f"❌ Error with GPT: {e}"
