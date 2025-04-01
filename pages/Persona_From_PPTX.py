@@ -4,17 +4,18 @@ from pptx import Presentation
 import os
 from openai import OpenAI
 import matplotlib.pyplot as plt
+import pandas as pd
 import numpy as np
 from io import BytesIO
 from fpdf import FPDF
-import re
 
-st.set_page_config(page_title="Enhanced Persona Generator + DALL·E", layout="wide")
-st.title("🧠 Persona Generator from PowerPoint with Image Avatars")
+st.set_page_config(page_title="Enhanced PPTX Persona Generator", layout="wide")
+st.title("📊 Enhanced Persona Generator from PowerPoint")
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-uploaded_file = st.file_uploader("Upload a PowerPoint (.pptx) with segmentation content", type=["pptx"])
+# Upload PPTX
+uploaded_file = st.file_uploader("Upload a PowerPoint (.pptx) with segmentation analysis", type=["pptx"])
 
 def extract_text_from_pptx(file):
     prs = Presentation(file)
@@ -35,90 +36,84 @@ def generate_gpt_response(prompt):
     )
     return response.choices[0].message.content.strip()
 
-def generate_dalle_image(description):
-    dalle_response = client.images.generate(
-        model="dall-e-3",
-        prompt=description,
-        size="1024x1024",
-        quality="standard",
-        n=1
-    )
-    return dalle_response.data[0].url
-
-    return dalle_response.data[0].url
-
+# Store memory context
 if "summary" not in st.session_state:
     st.session_state.summary = ""
 if "personas" not in st.session_state:
     st.session_state.personas = ""
-if "persona_images" not in st.session_state:
-    st.session_state.persona_images = {}
 
-# Step 1: Summary from PPT
-if uploaded_file and st.button("🔍 Generate Strategic Summary"):
+# Extract text and generate summary
+if uploaded_file and st.button("🔍 Generate Segmentation Summary"):
     ppt_text = extract_text_from_pptx(uploaded_file)
-    st.info("Sending content to GPT for segmentation summary...")
-    summary_prompt = f"""You are SAMI AI, an advanced insights assistant. Analyze this segmentation deck and provide a strategic summary including segment traits, differentiation, and business recommendations:
+    with st.expander("📄 Slide Text Extracted"):
+        st.text(ppt_text[:2000])
+    st.info("Sending content to GPT for strategic summary...")
 
-{ppt_text[:4000]}
-"""
+    summary_prompt = f"""You are SAMI AI, an advanced market insights engine. Analyze the following segmentation slides and produce a strategic summary. Include:
+- Segment descriptions (demographics, attitudes)
+- Key differentiators
+- Strategic implications for acquisition, loyalty, and innovation
+
+Slides:
+{ppt_text[:4000]}"""
     summary = generate_gpt_response(summary_prompt)
     st.session_state.summary = summary
     st.subheader("📌 Strategic Summary")
     st.markdown(summary)
 
-# Step 2: Persona generation
+# Generate Personas
 if st.session_state.summary and st.button("👥 Generate Personas"):
-    persona_prompt = f"""Based on this segmentation summary, generate 2-3 distinct personas. Each should be formatted as follows:
-
-**Name**: [Persona Name]  
-**Description**: [1–2 sentence summary]  
-**Traits**: [Bulleted list]  
-**Pain Points**:  
-**Motivations**:  
-**Preferred Channels**:  
-**Example Messaging**:
+    persona_prompt = f"""Based on this segmentation summary, generate 2-3 distinct personas. Each should include:
+- Name
+- Description
+- Traits
+- Pain Points
+- Motivations
+- Channels
+- Example Messaging
 
 Summary:
-{st.session_state.summary}
-"""
+{st.session_state.summary}"""
     personas = generate_gpt_response(persona_prompt)
     st.session_state.personas = personas
-    st.session_state.persona_images = {}  # reset images
     st.subheader("🎯 Personas")
     st.markdown(personas)
 
-# Step 3: Parse and Generate DALL·E Images
-if st.session_state.personas and st.button("🎨 Generate Persona Avatars"):
-    persona_blocks = re.findall(r"\*\*Name\*\*: (.*?)\n\*\*Description\*\*: (.*?)\n", st.session_state.personas)
-    for name, desc in persona_blocks:
-        prompt = f"Professional portrait of {desc.strip()}, digital illustration, neutral background"
-        try:
-            img_url = generate_dalle_image(prompt)
-            st.session_state.persona_images[name] = img_url
-        except Exception as e:
-            st.warning(f"Failed to generate image for {name}: {e}")
+# Radar Visualization
+if st.session_state.personas and st.button("📈 Visualize Personas"):
+    st.subheader("📊 Persona Trait Radar Chart (Mock Example)")
+    labels = ['Tech-savvy', 'Budget-conscious', 'Brand loyal', 'Innovator', 'Eco-conscious']
+    traits = {
+        'Explorer Emma': [5, 2, 4, 5, 3],
+        'Saver Sam': [2, 5, 3, 2, 4],
+        'Loyal Leo': [3, 3, 5, 2, 3]
+    }
 
-# Display personas + images
-if st.session_state.personas:
-    st.subheader("🧍 Persona Cards")
-    persona_blocks = re.findall(r"\*\*Name\*\*: (.*?)\n\*\*Description\*\*: (.*?)\n", st.session_state.personas)
-    for name, desc in persona_blocks:
-        st.markdown(f"#### {name}")
-        st.markdown(f"*{desc}*")
-        if name in st.session_state.persona_images:
-            st.image(st.session_state.persona_images[name], width=200)
+    angles = np.linspace(0, 2 * np.pi, len(labels), endpoint=False).tolist()
+    angles += angles[:1]
 
-# Step 4: Export to PDF
+    fig, ax = plt.subplots(figsize=(6, 6), subplot_kw=dict(polar=True))
+    for persona, values in traits.items():
+        values += values[:1]
+        ax.plot(angles, values, label=persona)
+        ax.fill(angles, values, alpha=0.1)
+
+    ax.set_yticklabels([])
+    ax.set_xticks(angles[:-1])
+    ax.set_xticklabels(labels)
+    ax.legend(loc='upper right', bbox_to_anchor=(1.3, 1))
+    st.pyplot(fig)
+
+# Export to PDF
 if st.session_state.personas and st.button("📄 Download PDF Summary"):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=10)
-    pdf.multi_cell(0, 5, "Strategic Summary\n" + st.session_state.summary)
+    pdf.multi_cell(0, 5, "Strategic Summary\\n" + st.session_state.summary)
+pdf.multi_cell(0, 5, "\\n\\nPersonas\\n" + st.session_state.personas)
     pdf.ln(4)
-    pdf.multi_cell(0, 5, "Personas\n" + st.session_state.personas)
-    pdf.ln(4)
-    for name, url in st.session_state.persona_images.items():
-        pdf.multi_cell(0, 5, f"[Avatar Placeholder for {name}]")
-    pdf_data = pdf.output(dest="S").encode("latin-1")
-    st.download_button("📥 Download PDF", pdf_data, file_name="persona_report.pdf", mime="application/pdf")
+    pdf.multi_cell(0, 5, "🎯 Personas\n" + st.session_state.personas)
+    buffer = BytesIO()
+    pdf.output(buffer)
+    buffer.seek(0)
+    st.download_button("📥 Download PDF", buffer, file_name="persona_report.pdf", mime="application/pdf")
