@@ -1,29 +1,23 @@
+# 📄 File: utils/gpt_helpers.py
+import os
 from openai import OpenAI
-import pandas as pd
 
-client = OpenAI()  # Make sure OPENAI_API_KEY is set in your environment
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-def summarize_comparisons(df, question_text="the above table comparison"):
-    markdown_table = df.head(30).to_markdown(index=False)
-
+def summarize_comparisons(markdown_table, context="cross-tab results"):
     prompt = f"""
-    You are a senior market researcher.
+You are a senior market research analyst. Analyze the following {context} and provide 3–5 key insights about differences between groups. Be concise, insightful, and specific.
 
-    Analyze the following cross-tabulated data and identify:
-    - Which groups differ most from others
-    - What each group's behavior or preference implies
-    - Any opportunities or areas of concern
-
-    Cross-tabulated Table:
-    {markdown_table}
-
-    Provide a concise, executive-style summary in bullet points.
-    """
-
-    response = client.chat.completions.create(
-        model="gpt-4",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.4,
-    )
-
-    return response.choices[0].message.content.strip()
+{markdown_table}
+"""
+    try:
+        response = client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "You are a senior research strategist."},
+                {"role": "user", "content": prompt}
+            ]
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"❌ Error with GPT: {e}"
