@@ -1,14 +1,7 @@
 streamlit>=1.10
-openai>=1.2.4
 pandas
 openpyxl
-matplotlib
-seaborn
-scikit-learn
+scipy
+numpy
 statsmodels
-semopy
-wordcloud
 fpdf
-python-pptx
-tabulate
-plotly
