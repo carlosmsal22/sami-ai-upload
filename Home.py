@@ -7,7 +7,7 @@ st.title("🧠 Welcome to SAMI AI")
 st.markdown("This is your all-in-one AI-powered research platform. Use the sidebar to access advanced analytical modules:")
 
 # 🆕 Phase 1 CrossTabs Suite
-st.sidebar.page_link("pages/CrossTabs_Analyzer_Phase1/main.py", label="📊 CrossTabs Analyzer Phase1")
+st.sidebar.page_link("pages/CrossTabs_Analyzer_Phase1.py", label="📊 CrossTabs Analyzer Phase1")
 
 # Legacy modules (optional)
 with st.sidebar.expander("🗂 OLD Modules (Legacy)"):
