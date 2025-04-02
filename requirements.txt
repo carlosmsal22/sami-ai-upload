@@ -1,7 +1,6 @@
-streamlit>=1.10
+streamlit
 pandas
 openpyxl
 scipy
 numpy
-statsmodels
-fpdf
+openai>=1.2.4
