@@ -10,7 +10,7 @@ Use the sidebar to access advanced analytical modules:
 """)
 
 st.sidebar.page_link("pages/CBC_Conjoint.py", label="📦 CBC Conjoint")
-st.sidebar.page_link("pages/CrossTabs_Analyzer.py", label="📊 Cross-Tabs Analyzer")
+st.sidebar.page_link("pages/CrossTabs_Analyzer_Phase1.py", label="📊 Cross-Tabs Analyzer")
 st.sidebar.page_link("pages/MaxDiff_Module.py", label="📊 MaxDiff Module")
 st.sidebar.page_link("pages/TURF_Module.py", label="🌱 TURF Module")
 st.sidebar.page_link("pages/Text_Analytics.py", label="📝 Text Analytics")
