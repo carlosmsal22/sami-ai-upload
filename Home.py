@@ -1,26 +1,26 @@
-
+# Home.py – Main Landing Page for SAMI AI Streamlit App
 import streamlit as st
 
-st.set_page_config(page_title="SAMI AI - Home", layout="wide")
+st.set_page_config(page_title="SAMI AI Home", layout="wide")
 
-st.title("🧠 Welcome to SAMI AI")
-st.markdown("This is your all-in-one AI-powered research platform. Use the sidebar to access advanced analytical modules:")
+st.title("🤖 Welcome to SAMI AI Advanced Analytical Tool")
 
-# 🆕 Phase 1 CrossTabs Suite
-st.sidebar.page_link("pages/CrossTabs_Analyzer_Phase1.py", label="📊 CrossTabs Analyzer Phase1")
+st.markdown("""
+Welcome to the SAMI AI platform. Explore our suite of powerful modules:
 
-# Legacy modules (optional)
-with st.sidebar.expander("🗂 OLD Modules (Legacy)"):
-    st.sidebar.page_link("pages/OLD_CrossTabs_Analyzer.py", label="📄 OLD CrossTabs Analyzer")
-    st.sidebar.page_link("pages/OLD_CrossTabs_Step2.py", label="📄 OLD CrossTabs Step2")
+- 📊 **Executive Insight Generator**: Upload cross-tab files, generate GPT-style summaries and visual charts.
+- 🧮 **CBC Conjoint Analyzer**: Simulate consumer preferences using choice-based conjoint.
+- 📈 **MaxDiff Analysis Module**: Identify what matters most to your customers.
+- 🌐 **TURF Analysis Tool**: Optimize your product mix for maximum reach.
+- 📚 **LCA & SEM Models**: Dive into latent class and structural modeling.
 
-# Other modules
-st.sidebar.page_link("pages/CBC_Conjoint.py", label="📈 CBC Conjoint")
-st.sidebar.page_link("pages/LCA_Module.py", label="📊 LCA Module")
-st.sidebar.page_link("pages/MaxDiff_Module.py", label="📊 MaxDiff Module")
-st.sidebar.page_link("pages/Persona_From_PPTX.py", label="🧬 Persona From PPTX")
-st.sidebar.page_link("pages/Persona_Generator.py", label="🧠 Persona Generator")
-st.sidebar.page_link("pages/SAMI_Analyzer.py", label="📊 SAMI Analyzer")
-st.sidebar.page_link("pages/SEM_Module.py", label="📈 SEM Module")
-st.sidebar.page_link("pages/Text_Analytics.py", label="📝 Text Analytics")
-st.sidebar.page_link("pages/TURF_Module.py", label="📊 TURF Module")
+Use the sidebar to navigate between modules.
+""")
+
+st.sidebar.header("Navigation")
+st.sidebar.page_link("pages/Executive_Insight_Generator.py", label="📊 Executive Insight Generator")
+st.sidebar.page_link("pages/CBC_Conjoint.py", label="🧮 CBC Conjoint Analyzer")
+st.sidebar.page_link("pages/MaxDiff_Analyzer.py", label="📈 MaxDiff Analysis")
+st.sidebar.page_link("pages/TURF_Analyzer.py", label="🌐 TURF Analyzer")
+st.sidebar.page_link("pages/LCA_Model.py", label="📚 Latent Class Analysis")
+st.sidebar.page_link("pages/SEM_Model.py", label="📚 Structural Equation Modeling")
