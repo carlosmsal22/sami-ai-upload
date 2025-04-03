@@ -4,3 +4,8 @@ openpyxl
 scipy
 numpy
 openai>=1.2.4
+
+# Add these for export and charting:
+matplotlib          # 📊 For visual charts
+python-docx         # 📄 For Word document export
+fpdf                # 📝 For PDF generation
