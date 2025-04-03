@@ -1,4 +1,5 @@
 # /pages/Executive_Insight_Generator.py
+# /pages/Executive_Insight_Generator.py
 import streamlit as st
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -16,8 +17,25 @@ st.sidebar.header("Upload Crosstab File")
 uploaded_file = st.sidebar.file_uploader("Upload a WinCross-style Excel file (.xlsx)", type="xlsx")
 
 if uploaded_file:
-    df = pd.read_excel(uploaded_file, sheet_name='Banner (US)', header=None)
-    st.success("File uploaded successfully.")
+    sheet_names = pd.ExcelFile(uploaded_file).sheet_names
+    selected_sheet = st.sidebar.selectbox("Select Sheet", sheet_names)
+    df = pd.read_excel(uploaded_file, sheet_name=selected_sheet, header=None)
+    st.success(f"Loaded sheet: {selected_sheet}")
+
+    # Custom dropdown from banner plan
+    banner_options = [
+        "Total",
+        "Residential Units Managed",
+        "Job Role",
+        "Job Title",
+        "Change in Living Expectations",
+        "Track Utility Expenses",
+        "Percent of Rent Delinquent",
+        "Security Deposit Return Method",
+        "Staff Turnover Rate",
+        "Digital vs Paper Rent Payments"
+    ]
+    selected_banner = st.sidebar.selectbox("Select Banner Breakout", banner_options)
 
     # --- Helper Functions ---
     def parse_tables(df):
