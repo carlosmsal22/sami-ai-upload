@@ -242,41 +242,44 @@ if st.button("🚀 Run Analysis", type="primary") and uploaded_file:
                     with st.expander("View Anomalies"):
                         st.dataframe(anomalies)
             
-            # GPT Insights
-with st.spinner("Generating AI insights..."):
-    try:
-        # Try using to_markdown() if tabulate is available
-        stats_summary = df.describe().to_markdown()
-    except ImportError:
-        # Fallback to to_string() if tabulate not available
-        stats_summary = df.describe().to_string()
-    
-    data_summary = f"""
-    Dataset Shape: {df.shape}
-    Numeric Columns: {df.select_dtypes(include=np.number).columns.tolist()}
-    Sample Statistics:
-    {stats_summary}
-    """
-                
-                response = client.chat.completions.create(
-                    model="gpt-4-turbo",
-                    messages=[
-                        {
-                            "role": "system",
-                            "content": "You're a senior data analyst. Provide: 1) Key patterns 2) Business implications 3) Recommended actions"
-                        },
-                        {
-                            "role": "user",
-                            "content": f"Analyze this data:\n{data_summary}\n\nUser Question: {user_prompt or 'Provide comprehensive analysis'}"
-                        }
-                    ],
-                    temperature=0.7
-                )
-                
-                insights = response.choices[0].message.content
-                
-                st.subheader("💡 AI-Generated Insights")
-                st.markdown(insights)
+            # GPT Insights (corrected version)
+            with st.spinner("Generating AI insights..."):
+                try:
+                    # Try using to_markdown() if tabulate is available
+                    try:
+                        stats_summary = df.describe().to_markdown()
+                    except ImportError:
+                        # Fallback to to_string() if tabulate not available
+                        stats_summary = df.describe().to_string()
+                    
+                    data_summary = f"""
+                    Dataset Shape: {df.shape}
+                    Numeric Columns: {df.select_dtypes(include=np.number).columns.tolist()}
+                    Sample Statistics:
+                    {stats_summary}
+                    """
+                    
+                    response = client.chat.completions.create(
+                        model="gpt-4-turbo",
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": "You're a senior data analyst. Provide: 1) Key patterns 2) Business implications 3) Recommended actions"
+                            },
+                            {
+                                "role": "user",
+                                "content": f"Analyze this data:\n{data_summary}\n\nUser Question: {user_prompt or 'Provide comprehensive analysis'}"
+                            }
+                        ],
+                        temperature=0.7
+                    )
+                    
+                    insights = response.choices[0].message.content
+                    st.subheader("💡 AI-Generated Insights")
+                    st.markdown(insights)
+                    
+                except Exception as e:
+                    st.error(f"AI analysis failed: {str(e)}")
             
             # PDF Report Generation
             pdf = FPDF()
