@@ -234,13 +234,20 @@ if st.button("🚀 Run Analysis", type="primary") and uploaded_file:
                         st.dataframe(anomalies)
             
             # GPT Insights
-            with st.spinner("Generating AI insights..."):
-                data_summary = f"""
-                Dataset Shape: {df.shape}
-                Numeric Columns: {df.select_dtypes(include=np.number).columns.tolist()}
-                Sample Statistics:
-                {df.describe().to_markdown()}
-                """
+with st.spinner("Generating AI insights..."):
+    try:
+        # Try using to_markdown() if tabulate is available
+        stats_summary = df.describe().to_markdown()
+    except ImportError:
+        # Fallback to to_string() if tabulate not available
+        stats_summary = df.describe().to_string()
+    
+    data_summary = f"""
+    Dataset Shape: {df.shape}
+    Numeric Columns: {df.select_dtypes(include=np.number).columns.tolist()}
+    Sample Statistics:
+    {stats_summary}
+    """
                 
                 response = client.chat.completions.create(
                     model="gpt-4-turbo",
