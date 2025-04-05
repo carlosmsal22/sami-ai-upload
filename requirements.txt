@@ -14,3 +14,5 @@ statsmodels>=0.14.0
 python-docx
 python-pptx>=0.6.21
 openai>=1.0.0
+semopy>=2.3.10  # For SEM analysis
+wordcloud>=1.9.3  # For word clouds
