@@ -30,8 +30,10 @@ if 'upload_error' not in st.session_state:
     st.session_state.upload_error = None
 if 'openai_error' not in st.session_state:
     st.session_state.openai_error = None
+if 'analysis_done' not in st.session_state:
+    st.session_state.analysis_done = False
 
-# Initialize OpenAI client with error handling
+# Initialize OpenAI client
 try:
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 except Exception as e:
@@ -39,7 +41,7 @@ except Exception as e:
     client = None
 
 # =============================================
-# ENHANCED FILE UPLOADER (FIXED FOR EXCEL)
+# ENHANCED FILE UPLOADER
 # =============================================
 def safe_file_upload():
     try:
@@ -50,7 +52,6 @@ def safe_file_upload():
         )
         
         if uploaded_file is not None:
-            # Validate file object
             if not hasattr(uploaded_file, 'name'):
                 st.session_state.upload_error = "Invalid file object"
                 return None
@@ -60,7 +61,6 @@ def safe_file_upload():
                     if uploaded_file.name.endswith('.csv'):
                         df = pd.read_csv(uploaded_file)
                     else:
-                        # Handle Excel with explicit engine
                         df = pd.read_excel(uploaded_file, engine='openpyxl')
                     
                     if df.empty:
@@ -69,6 +69,7 @@ def safe_file_upload():
                         
                     st.session_state.df = df
                     st.session_state.upload_error = None
+                    st.session_state.analysis_done = False
                     return df
                 
                 except Exception as e:
@@ -82,10 +83,13 @@ def safe_file_upload():
         return None
 
 # =============================================
-# ANALYSIS FUNCTIONS (WITH ERROR HANDLING)
+# ANALYSIS FUNCTIONS (ALL FEATURES RESTORED)
 # =============================================
-def run_correlation_analysis(df):
-    try:
+def run_advanced_analysis(df, analysis_types, user_prompt=""):
+    results = {}
+    
+    # 1. Correlation Analysis
+    if "Correlation Matrix" in analysis_types:
         numeric_cols = df.select_dtypes(include=np.number).columns
         if len(numeric_cols) > 1:
             st.subheader("🔗 Correlation Matrix")
@@ -100,64 +104,114 @@ def run_correlation_analysis(df):
                 annot_kws={"size": 9}
             )
             st.pyplot(fig)
-            return corr
-        else:
-            st.warning("Need at least 2 numeric columns for correlation")
-            return None
-    except Exception as e:
-        st.error(f"Correlation analysis failed: {str(e)}")
-        return None
-
-def generate_ai_insights(df, prompt=""):
-    if client is None:
-        st.error("OpenAI client not initialized")
-        return None
+            results['correlation'] = corr
     
-    try:
-        # Create data summary for AI
-        data_summary = f"""
-        Dataset Shape: {df.shape}
-        Columns: {df.columns.tolist()}
-        Numeric Columns: {df.select_dtypes(include=np.number).columns.tolist()}
-        Sample Statistics:
-        {df.describe().to_markdown()}
-        """
-        
-        with st.spinner("Generating AI insights..."):
-            response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a data analyst. Provide clear insights about this data:"
-                    },
-                    {
-                        "role": "user",
-                        "content": f"{data_summary}\n\nUser question: {prompt or 'Identify key patterns'}"
-                    }
-                ],
-                temperature=0.7,
-                max_tokens=1000
+    # 2. Distribution Analysis
+    if "Distributions" in analysis_types:
+        st.subheader("📊 Feature Distributions")
+        numeric_cols = df.select_dtypes(include=np.number).columns
+        for col in numeric_cols[:5]:  # Show first 5 for demo
+            fig = px.histogram(
+                df, x=col, marginal="box",
+                title=f"Distribution of {col}",
+                hover_data=df.columns
             )
-            return response.choices[0].message.content
-    except Exception as e:
-        st.session_state.openai_error = f"OpenAI API error: {str(e)}"
-        return None
+            st.plotly_chart(fig, use_container_width=True)
+    
+    # 3. Anomaly Detection
+    if "Anomaly Detection" in analysis_types:
+        st.subheader("⚠️ Anomaly Report")
+        numeric_cols = df.select_dtypes(include=np.number).columns
+        anomalies = pd.DataFrame()
+        
+        for col in numeric_cols:
+            z_scores = np.abs(stats.zscore(df[col].dropna()))
+            outliers = df[z_scores > 3]
+            if not outliers.empty:
+                outliers['Anomaly_Type'] = f"{col} (Z > 3)"
+                anomalies = pd.concat([anomalies, outliers])
+        
+        if not anomalies.empty:
+            st.dataframe(anomalies)
+        else:
+            st.success("No anomalies detected (Z > 3)")
+        results['anomalies'] = anomalies
+    
+    # 4. AI Insights (with tabulate workaround)
+    if "AI Insights" in analysis_types and client:
+        st.subheader("💡 AI Insights")
+        try:
+            # Create data summary without .to_markdown()
+            data_summary = f"""
+            Dataset Shape: {df.shape}
+            Columns: {', '.join(df.columns)}
+            Numeric Columns: {', '.join(df.select_dtypes(include=np.number).columns)}
+            
+            Sample Statistics:
+            Mean Values:
+            {df.select_dtypes(include=np.number).mean().to_string()}
+            
+            Value Counts:
+            {df.select_dtypes(include='object').nunique().to_string()}
+            """
+            
+            with st.spinner("Generating insights..."):
+                response = client.chat.completions.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You're a data analyst. Provide: 1) Key patterns 2) Business insights 3) Recommendations"
+                        },
+                        {
+                            "role": "user",
+                            "content": f"{data_summary}\n\nUser question: {user_prompt or 'Analyze this data'}"
+                        }
+                    ],
+                    temperature=0.7
+                )
+                insights = response.choices[0].message.content
+                st.markdown(insights)
+                results['insights'] = insights
+        except Exception as e:
+            st.error(f"AI analysis failed: {str(e)}")
+    
+    return results
 
 # =============================================
-# MAIN INTERFACE
+# MAIN INTERFACE (WITH SIDEBAR)
 # =============================================
 st.title("🔍 SAMI AI - Advanced Analytics Suite")
+
+# Sidebar with options
+with st.sidebar:
+    st.header("Analysis Settings")
+    analysis_options = st.multiselect(
+        "Select analyses:",
+        options=[
+            "Correlation Matrix",
+            "Distributions",
+            "Anomaly Detection",
+            "AI Insights"
+        ],
+        default=["Correlation Matrix", "Distributions"]
+    )
+    
+    if client:
+        user_prompt = st.text_area("Ask about your data:")
+    else:
+        st.warning("OpenAI unavailable - AI Insights disabled")
 
 # File Upload
 df = safe_file_upload()
 
-# Display errors if any
+# Display errors
 if st.session_state.upload_error:
     st.error(st.session_state.upload_error)
 if st.session_state.openai_error:
     st.error(st.session_state.openai_error)
 
+# Run analysis
 if st.session_state.df is not None:
     df = st.session_state.df
     st.success(f"✅ Successfully loaded {len(df)} rows")
@@ -165,7 +219,6 @@ if st.session_state.df is not None:
     with st.expander("🔍 Data Preview", expanded=True):
         st.dataframe(df.head(3))
         
-        # Basic stats
         cols = st.columns(3)
         with cols[0]:
             st.metric("Total Rows", len(df))
@@ -174,41 +227,33 @@ if st.session_state.df is not None:
         with cols[2]:
             st.metric("Missing Values", df.isnull().sum().sum())
 
-    # Analysis Options
-    st.subheader("📌 Analysis Options")
-    analysis_options = st.multiselect(
-        "Select analyses to run:",
-        options=[
-            "Correlation Analysis",
-            "Distribution Analysis",
-            "AI Insights"
-        ],
-        default=["Correlation Analysis"]
-    )
-    
-    user_prompt = st.text_area("Ask a question about your data:")
-    
-    if st.button("🚀 Run Selected Analyses", type="primary"):
-        with st.spinner("Running analyses..."):
-            # Correlation Analysis
-            if "Correlation Analysis" in analysis_options:
-                run_correlation_analysis(df)
+    if st.button("🚀 Run Analysis", type="primary"):
+        with st.spinner("Analyzing..."):
+            results = run_advanced_analysis(df, analysis_options, user_prompt)
+            st.session_state.analysis_done = True
+            st.session_state.results = results
+
+    # Report Generation
+    if st.session_state.analysis_done and 'results' in st.session_state:
+        st.subheader("📄 Report Generation")
+        if st.button("📥 Download Summary"):
+            pdf = FPDF()
+            pdf.add_page()
+            pdf.set_font("Arial", size=12)
+            pdf.cell(200, 10, txt="SAMI Analysis Report", ln=1, align='C')
             
-            # Distribution Analysis
-            if "Distribution Analysis" in analysis_options:
-                st.subheader("📊 Distributions")
-                numeric_cols = df.select_dtypes(include=np.number).columns
-                for col in numeric_cols[:3]:  # Show first 3 for demo
-                    fig, ax = plt.subplots()
-                    df[col].hist(ax=ax, bins=20)
-                    ax.set_title(f"Distribution of {col}")
-                    st.pyplot(fig)
+            # Add analysis results to PDF
+            if 'insights' in st.session_state.results:
+                pdf.multi_cell(0, 5, st.session_state.results['insights'])
             
-            # AI Insights
-            if "AI Insights" in analysis_options:
-                st.subheader("💡 AI Insights")
-                insights = generate_ai_insights(df, user_prompt)
-                if insights:
-                    st.markdown(insights)
-                elif st.session_state.openai_error:
-                    st.error(st.session_state.openai_error)
+            # Save and offer download
+            pdf_output = BytesIO()
+            pdf.output(pdf_output)
+            pdf_output.seek(0)
+            
+            st.download_button(
+                label="Download PDF",
+                data=pdf_output,
+                file_name="sami_report.pdf",
+                mime="application/pdf"
+            )
