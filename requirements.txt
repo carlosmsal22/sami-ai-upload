@@ -1,8 +1,9 @@
+streamlit
+pandas
+openpyxl
+scipy
+numpy
+openai>=1.2.4
+matplotlib
 python-docx
-plotly
-wordcloud
-semopy
-seaborn
-pptx
-statsmodels
-scikit-learn
+fpdf
