@@ -16,7 +16,7 @@ from fpdf import FPDF
 import plotly.express as px
 
 # =============================================
-# INITIALIZATION (CRITICAL FOR UPLOADS)
+# INITIALIZATION
 # =============================================
 st.set_page_config(
     page_title="SAMI Analyzer Pro",
@@ -24,17 +24,16 @@ st.set_page_config(
     layout="wide"
 )
 
-# Initialize all session state variables FIRST
+# Initialize session state
 if 'df' not in st.session_state:
     st.session_state.df = None
 if 'upload_error' not in st.session_state:
     st.session_state.upload_error = None
 
 # =============================================
-# FAILSAFE FILE UPLOADER
+# FILE UPLOADER
 # =============================================
 def safe_file_upload():
-    """Guaranteed-working file upload handler"""
     try:
         uploaded_file = st.file_uploader(
             "**Upload Dataset (CSV/Excel)**",
@@ -43,19 +42,16 @@ def safe_file_upload():
         )
         
         if uploaded_file is not None:
-            # Validate file object
             if not hasattr(uploaded_file, 'name'):
                 st.session_state.upload_error = "Invalid file object"
                 return None
             
-            # Read based on file type
             with st.spinner("Processing file..."):
                 if uploaded_file.name.endswith('.csv'):
                     df = pd.read_csv(uploaded_file)
                 else:
                     df = pd.read_excel(uploaded_file, engine='openpyxl')
             
-            # Basic validation
             if df.empty:
                 st.session_state.upload_error = "Empty file detected"
                 return None
@@ -75,7 +71,7 @@ def safe_file_upload():
 # =============================================
 st.title("🔍 SAMI AI - Advanced Analytics Suite")
 
-# --- File Upload Section ---
+# File Upload
 df = safe_file_upload()
 
 if st.session_state.upload_error:
@@ -86,7 +82,7 @@ if st.session_state.df is not None:
     st.success(f"✅ Successfully loaded {len(df)} rows")
     st.dataframe(df.head(3))
     
-    # --- Analysis Options ---
+    # Analysis Options
     st.subheader("🔍 Analysis Options")
     col1, col2 = st.columns(2)
     with col1:
@@ -96,15 +92,15 @@ if st.session_state.df is not None:
         show_anomaly = st.checkbox("Anomaly Detection", True)
         show_pca = st.checkbox("PCA Projection")
     
-    # --- Run Analysis ---
+    # Run Analysis
     if st.button("🚀 Run Analysis", type="primary"):
         with st.spinner("Analyzing data..."):
             try:
-                # 1. Basic Stats
+                # Basic Stats
                 st.subheader("📊 Descriptive Statistics")
                 st.dataframe(df.describe())
                 
-                # 2. Correlation Matrix
+                # Correlation Matrix
                 if show_corr:
                     numeric_cols = df.select_dtypes(include=np.number).columns
                     if len(numeric_cols) > 1:
@@ -123,24 +119,23 @@ if st.session_state.df is not None:
                     else:
                         st.warning("Need at least 2 numeric columns for correlation")
                 
-                # 3. Distributions
+                # Distributions
                 if show_dist:
                     st.subheader("📈 Feature Distributions")
                     numeric_cols = df.select_dtypes(include=np.number).columns
-                    for col in numeric_cols[:3]:  # Limit to 3 for demo
+                    for col in numeric_cols[:3]:
                         fig, ax = plt.subplots()
                         df[col].hist(ax=ax, bins=20)
                         ax.set_title(f"Distribution of {col}")
                         st.pyplot(fig)
                 
-                # 4. Anomaly Detection
+                # Anomaly Detection
                 if show_anomaly:
                     st.subheader("⚠️ Anomaly Report")
                     numeric_cols = df.select_dtypes(include=np.number).columns
                     anomalies = pd.DataFrame()
                     
                     for col in numeric_cols:
-                        # Z-score method
                         z_scores = np.abs(stats.zscore(df[col].dropna()))
                         outliers = df[z_scores > 3]
                         if not outliers.empty:
@@ -152,7 +147,7 @@ if st.session_state.df is not None:
                     else:
                         st.success("No anomalies detected (Z > 3)")
                 
-                # 5. PCA
+                # PCA
                 if show_pca:
                     numeric_cols = df.select_dtypes(include=np.number).columns
                     if len(numeric_cols) >= 3:
@@ -171,4 +166,3 @@ if st.session_state.df is not None:
                         
             except Exception as e:
                 st.error(f"Analysis error: {str(e)}")
-
