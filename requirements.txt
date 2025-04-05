@@ -16,3 +16,5 @@ openai>=1.0.0
 scikit-learn>=1.0.0
 python-pptx>=0.6.21
 seaborn>=0.12.0
+fpdf2>=1.7.2
+streamlit>=1.28.0
