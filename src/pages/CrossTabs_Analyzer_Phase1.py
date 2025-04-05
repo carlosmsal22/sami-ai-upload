@@ -2,11 +2,12 @@ import streamlit as st
 import pandas as pd
 import sys
 from pathlib import Path
+from io import BytesIO  # Add this import at the top
 
-# Add the src directory to Python path (works in GitHub Codespaces and Render)
+# Add the src directory to Python path
 sys.path.append(str(Path(__file__).parent.parent))
 
-# Now import from utils directly
+# Import from utils
 from utils.stats_helpers import run_group_comparison, run_z_chi_tests, get_descriptive_stats
 
 st.set_page_config(page_title="CrossTabs Analyzer – Phase 1", layout="wide")
@@ -15,11 +16,11 @@ st.title("📊 CrossTabs Analyzer – Phase 1")
 st.markdown("---")
 tabs = st.tabs(["📘 Frequency Tables", "🔍 Group Comparisons", "🧪 Z / Chi-Square Tests", "📏 Descriptive Stats", "📤 Export Tools"])
 
-# Initialize session state if not present
+# Initialize session state
 if "df" not in st.session_state:
     st.session_state["df"] = None
 
-# File uploader with error handling
+# File uploader with enhanced error handling
 uploaded_file = st.file_uploader(
     "Upload a cross-tabulated file (Excel format)", 
     type=["xlsx", "xls"],
@@ -32,9 +33,9 @@ if uploaded_file:
         st.session_state["df"] = df
         st.success("✅ File loaded successfully!")
         
-        # Debug: Show raw columns
         with st.expander("🔍 Debug: Show Column Structure"):
             st.write("Columns:", df.columns.tolist())
+            st.write("Shape:", df.shape)
             st.write("Data Sample:", df.head(3))
             
     except Exception as e:
@@ -46,7 +47,7 @@ if st.button("🔄 Reset Data"):
     st.session_state["df"] = None
     st.rerun()
 
-# Main analysis tabs (only show if data exists)
+# Main analysis tabs
 if st.session_state["df"] is not None:
     df = st.session_state["df"]
     
@@ -54,7 +55,6 @@ if st.session_state["df"] is not None:
         st.subheader("📘 Frequency Table")
         st.dataframe(df, use_container_width=True)
         
-        # Add value counts for each column
         with st.expander("🔢 Value Counts"):
             for col in df.columns:
                 st.write(f"**{col}**")
@@ -98,6 +98,7 @@ if st.session_state["df"] is not None:
     with tabs[4]:
         st.subheader("📤 Export Tools")
         
+        # CSV Export
         st.download_button(
             label="Download CSV",
             data=df.to_csv(index=False),
@@ -105,15 +106,20 @@ if st.session_state["df"] is not None:
             mime="text/csv"
         )
         
+        # Fixed Excel Export
+        excel_buffer = BytesIO()
+        with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False)
+        
         st.download_button(
             label="Download Excel",
-            data=df.to_excel(index=False),
+            data=excel_buffer.getvalue(),
             file_name="crosstabs_data.xlsx",
-            mime="application/vnd.ms-excel"
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 else:
     st.warning("⚠️ Please upload a file to begin analysis")
 
-# Debug session state
+# Optional debug section
 with st.expander("🐛 Debug: Session State"):
     st.write(st.session_state)
