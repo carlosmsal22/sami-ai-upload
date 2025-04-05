@@ -10,8 +10,8 @@ sys.path.append(str(Path(__file__).parent.parent))
 # Import from utils
 from utils.stats_helpers import run_group_comparison, run_z_chi_tests, get_descriptive_stats
 
-st.set_page_config(page_title="CrossTabs Analyzer – Phase 1", layout="wide")
-st.title("📊 CrossTabs Analyzer – Phase 1")
+st.set_page_config(page_title="CrossTabs Analyzer", layout="wide")
+st.title("📊 CrossTabs Analyzer")
 
 st.markdown("---")
 tabs = st.tabs(["📘 Frequency Tables", "🔍 Group Comparisons", "🧪 Z / Chi-Square Tests", "📏 Descriptive Stats", "📄 Export Tools"])
