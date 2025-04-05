@@ -171,3 +171,4 @@ if st.session_state.df is not None:
                         
             except Exception as e:
                 st.error(f"Analysis error: {str(e)}")
+
