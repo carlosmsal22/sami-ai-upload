@@ -5,7 +5,6 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
-from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.ensemble import RandomForestRegressor
 from scipy import stats
 import os
@@ -43,8 +42,20 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# Initialize session state
+if 'df' not in st.session_state:
+    st.session_state.df = None
+if 'upload_error' not in st.session_state:
+    st.session_state.upload_error = None
+if 'openai_error' not in st.session_state:
+    st.session_state.openai_error = None
+
 # Initialize OpenAI client
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+try:
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+except Exception as e:
+    st.session_state.openai_error = f"OpenAI initialization failed: {str(e)}"
+    client = None
 
 # =============================================
 # SIDEBAR CONTROLS
@@ -52,7 +63,6 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 with st.sidebar:
     st.title("⚙️ Analysis Settings")
     
-    # Analysis Mode Selection
     analysis_mode = st.radio(
         "**Analysis Mode**",
         ["Basic EDA", "Advanced Insights", "Predictive Modeling"],
@@ -61,22 +71,16 @@ with st.sidebar:
         Predictive: Machine learning models"""
     )
     
-    # File Upload (optional - can move to main area)
-    uploaded_file = st.file_uploader(
-        "Upload Dataset",
-        type=["csv", "xlsx"],
-        help="Supports CSV and Excel files"
-    )
-    
-    # Advanced Options
     with st.expander("Advanced Options"):
         confidence_level = st.slider(
             "Confidence Level",
-            0.80, 0.99, 0.95
+            0.80, 0.99, 0.95,
+            help="Threshold for statistical significance"
         )
         max_categories = st.number_input(
             "Max Categories",
-            5, 50, 15
+            5, 50, 15,
+            help="Maximum categories to display in plots"
         )
 
 # =============================================
@@ -90,8 +94,8 @@ with st.expander("ℹ️ How to use this tool", expanded=False):
     st.markdown("""
     **5-Step Workflow:**
     1. **Upload** your dataset (Excel/CSV)
-    2. **Ask a question** about your data
-    3. **Select analyses** using checkboxes
+    2. **Select analysis mode** in sidebar
+    3. **Run analysis**
     4. **Explore** interactive visualizations
     5. **Download** full PDF report
     
@@ -99,10 +103,9 @@ with st.expander("ℹ️ How to use this tool", expanded=False):
     - "What are the key trends by region?"
     - "Show me unexpected relationships"
     - "Which factors impact [metric] most?"
-    - "Identify potential data quality issues"
     """)
 
-# File Uploader
+# File Uploader (Main Interface)
 uploaded_file = st.file_uploader(
     "**Upload your dataset**",
     type=["xlsx", "csv"],
@@ -135,9 +138,13 @@ user_prompt = st.text_area(
 @st.cache_data
 def load_data(uploaded_file):
     """Load data with caching"""
-    if uploaded_file.name.endswith('.csv'):
-        return pd.read_csv(uploaded_file)
-    return pd.read_excel(uploaded_file)
+    try:
+        if uploaded_file.name.endswith('.csv'):
+            return pd.read_csv(uploaded_file)
+        return pd.read_excel(uploaded_file, engine='openpyxl')
+    except Exception as e:
+        st.session_state.upload_error = f"Error loading file: {str(e)}"
+        return None
 
 def detect_anomalies(df):
     """Enhanced outlier detection"""
@@ -201,55 +208,50 @@ def generate_visuals(df):
         )
         st.plotly_chart(fig, use_container_width=True)
 
-# =============================================
-# MAIN EXECUTION
-# =============================================
-if st.button("🚀 Run Analysis", type="primary") and uploaded_file:
-    with st.spinner("Analyzing your data..."):
-        try:
-            # Load Data
-            df = load_data(uploaded_file)
-            st.session_state.df = df
+def run_analysis(df):
+    """Main analysis function"""
+    try:
+        # Data Quality Report
+        with st.expander("🔍 Data Quality Report", expanded=True):
+            cols = st.columns(3)
+            with cols[0]:
+                st.metric("Total Rows", df.shape[0])
+            with cols[1]:
+                st.metric("Total Columns", df.shape[1])
+            with cols[2]:
+                st.metric("Missing Values", df.isnull().sum().sum())
             
-            # Data Quality Report
-            with st.expander("🔍 Data Quality Report", expanded=True):
-                cols = st.columns(3)
-                with cols[0]:
-                    st.metric("Total Rows", df.shape[0])
-                with cols[1]:
-                    st.metric("Total Columns", df.shape[1])
-                with cols[2]:
-                    st.metric("Missing Values", df.isnull().sum().sum())
-                
-                # Column Summary
-                st.dataframe(
-                    pd.DataFrame({
-                        'Data Type': df.dtypes,
-                        'Missing %': (df.isnull().mean()*100).round(1),
-                        'Unique Values': df.nunique()
-                    }),
-                    use_container_width=True
-                )
-            
-            # Generate Visualizations
+            st.dataframe(
+                pd.DataFrame({
+                    'Data Type': df.dtypes,
+                    'Missing %': (df.isnull().mean()*100).round(1),
+                    'Unique Values': df.nunique()
+                }),
+                use_container_width=True
+            )
+        
+        # Generate Visualizations based on mode
+        if analysis_mode == "Basic EDA":
             generate_visuals(df)
-            
-            # Anomaly Detection
+        elif analysis_mode == "Advanced Insights":
+            generate_visuals(df)
             if show_anomaly:
                 anomalies = detect_anomalies(df)
                 if not anomalies.empty:
                     st.warning(f"⚠️ Detected {len(anomalies)} potential anomalies")
                     with st.expander("View Anomalies"):
                         st.dataframe(anomalies)
-            
-            # GPT Insights (corrected version)
+        elif analysis_mode == "Predictive Modeling":
+            st.warning("Predictive modeling features coming soon!")
+        
+        # GPT Insights
+        if client:
             with st.spinner("Generating AI insights..."):
                 try:
                     # Try using to_markdown() if tabulate is available
                     try:
                         stats_summary = df.describe().to_markdown()
                     except ImportError:
-                        # Fallback to to_string() if tabulate not available
                         stats_summary = df.describe().to_string()
                     
                     data_summary = f"""
@@ -260,7 +262,7 @@ if st.button("🚀 Run Analysis", type="primary") and uploaded_file:
                     """
                     
                     response = client.chat.completions.create(
-                        model="gpt-4-turbo",
+                        model="gpt-3.5-turbo",
                         messages=[
                             {
                                 "role": "system",
@@ -278,30 +280,39 @@ if st.button("🚀 Run Analysis", type="primary") and uploaded_file:
                     st.subheader("💡 AI-Generated Insights")
                     st.markdown(insights)
                     
+                    # PDF Report Generation
+                    pdf = FPDF()
+                    pdf.add_page()
+                    pdf.set_font("Arial", size=12)
+                    pdf.cell(200, 10, txt="SAMI AI Analysis Report", ln=1, align='C')
+                    pdf.multi_cell(0, 5, insights)
+                    pdf_output = BytesIO()
+                    pdf.output(pdf_output)
+                    pdf_output.seek(0)
+                    
+                    st.download_button(
+                        "📥 Download Full Report (PDF)",
+                        data=pdf_output,
+                        file_name=f"SAMI_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
+                        mime="application/pdf"
+                    )
+                    
                 except Exception as e:
                     st.error(f"AI analysis failed: {str(e)}")
+        else:
+            st.warning("OpenAI client not available - AI insights disabled")
             
-            # PDF Report Generation
-            pdf = FPDF()
-            pdf.add_page()
-            pdf.set_font("Arial", size=12)
-            
-            # Add report content
-            pdf.cell(200, 10, txt="SAMI AI Analysis Report", ln=True, align='C')
-            pdf.multi_cell(0, 5, insights)
-            
-            # Save to buffer
-            pdf_output = BytesIO()
-            pdf.output(pdf_output)
-            pdf_output.seek(0)
-            
-            # Download Button
-            st.download_button(
-                "📥 Download Full Report (PDF)",
-                data=pdf_output,
-                file_name=f"SAMI_Report_{datetime.now().strftime('%Y%m%d')}.pdf",
-                mime="application/pdf"
-            )
-            
-        except Exception as e:
-            st.error(f"Analysis failed: {str(e)}")
+    except Exception as e:
+        st.error(f"Analysis failed: {str(e)}")
+
+# =============================================
+# MAIN EXECUTION
+# =============================================
+if st.button("🚀 Run Analysis", type="primary") and uploaded_file:
+    df = load_data(uploaded_file)
+    if df is not None:
+        st.session_state.df = df
+        st.success(f"✅ Successfully loaded {len(df)} rows")
+        run_analysis(df)
+elif uploaded_file and st.session_state.df is not None:
+    st.info("Data already loaded. Press 'Run Analysis' to refresh results.")
