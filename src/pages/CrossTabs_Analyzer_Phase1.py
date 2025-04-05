@@ -1,6 +1,12 @@
-
 import streamlit as st
 import pandas as pd
+import sys
+from pathlib import Path
+
+# Add the src directory to Python path (works in GitHub Codespaces and Render)
+sys.path.append(str(Path(__file__).parent.parent))
+
+# Now import from utils directly
 from utils.stats_helpers import run_group_comparison, run_z_chi_tests, get_descriptive_stats
 
 st.set_page_config(page_title="CrossTabs Analyzer – Phase 1", layout="wide")
