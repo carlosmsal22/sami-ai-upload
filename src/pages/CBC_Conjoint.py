@@ -46,19 +46,7 @@ if uploaded_file:
         st.pyplot(fig)
 
         # GPT interpretation
-                # GPT interpretation
         system_prompt = f"You are a research analyst. Based on these part-worth utilities from a CBC model:\n{utilities.to_string()}"
-
-        try:
-            with st.spinner("GPT analyzing the results..."):
-                response = client.chat.completions.create(
-                    model="gpt-3.5-turbo",
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": "Please summarize the key findings and attribute importance."}
-                    ]
-                )
-                st.markdown(response.choices[0].message.content)
 
         try:
             with st.spinner("GPT analyzing the results..."):
