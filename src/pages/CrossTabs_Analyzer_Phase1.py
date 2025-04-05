@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import sys
 from pathlib import Path
-from io import BytesIO  # Add this import at the top
+from io import BytesIO
 
 # Add the src directory to Python path
 sys.path.append(str(Path(__file__).parent.parent))
@@ -98,25 +98,40 @@ if st.session_state["df"] is not None:
     with tabs[4]:
         st.subheader("📤 Export Tools")
         
-        # CSV Export
-        st.download_button(
-            label="Download CSV",
-            data=df.to_csv(index=False),
-            file_name="crosstabs_data.csv",
-            mime="text/csv"
-        )
-        
-        # Fixed Excel Export
-        excel_buffer = BytesIO()
-        with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-            df.to_excel(writer, index=False)
-        
-        st.download_button(
-            label="Download Excel",
-            data=excel_buffer.getvalue(),
-            file_name="crosstabs_data.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+        try:
+            # CSV Export (works with MultiIndex)
+            st.download_button(
+                label="Download CSV",
+                data=df.to_csv(index=False),
+                file_name="crosstabs_data.csv",
+                mime="text/csv"
+            )
+            
+            # Excel Export with MultiIndex fix
+            excel_buffer = BytesIO()
+            with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
+                # Create a copy to avoid modifying original DataFrame
+                export_df = df.copy()
+                
+                # Flatten MultiIndex columns
+                if isinstance(export_df.columns, pd.MultiIndex):
+                    export_df.columns = ['_'.join(filter(None, map(str, col))).strip() 
+                                      for col in export_df.columns.values]
+                
+                export_df.to_excel(writer, index=False, sheet_name="Data")
+            
+            excel_buffer.seek(0)
+            
+            st.download_button(
+                label="Download Excel",
+                data=excel_buffer,
+                file_name="crosstabs_data.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+            
+        except Exception as e:
+            st.error(f"Export failed: {str(e)}")
+
 else:
     st.warning("⚠️ Please upload a file to begin analysis")
 
