@@ -52,22 +52,31 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 with st.sidebar:
     st.title("⚙️ Analysis Settings")
     
+    # Analysis Mode Selection
     analysis_mode = st.radio(
         "**Analysis Mode**",
         ["Basic EDA", "Advanced Insights", "Predictive Modeling"],
-        help="Basic: Descriptive stats\nAdvanced: Statistical tests\nPredictive: ML modeling"
+        help="""Basic: Descriptive statistics and visualizations
+        Advanced: Statistical tests and correlations
+        Predictive: Machine learning models"""
     )
     
+    # File Upload (optional - can move to main area)
+    uploaded_file = st.file_uploader(
+        "Upload Dataset",
+        type=["csv", "xlsx"],
+        help="Supports CSV and Excel files"
+    )
+    
+    # Advanced Options
     with st.expander("Advanced Options"):
         confidence_level = st.slider(
             "Confidence Level",
-            0.80, 0.99, 0.95,
-            help="Threshold for statistical significance"
+            0.80, 0.99, 0.95
         )
         max_categories = st.number_input(
             "Max Categories",
-            5, 50, 15,
-            help="Maximum categories to display in plots"
+            5, 50, 15
         )
 
 # =============================================
