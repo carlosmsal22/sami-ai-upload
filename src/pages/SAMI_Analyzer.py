@@ -172,19 +172,3 @@ if st.session_state.df is not None:
             except Exception as e:
                 st.error(f"Analysis error: {str(e)}")
 
-# =============================================
-# DEPENDENCY NOTES (Must include in requirements.txt)
-# =============================================
-"""
-streamlit>=1.28.0
-pandas>=2.0.0
-numpy>=1.24.0
-scikit-learn>=1.0.0
-scipy>=1.0.0
-matplotlib>=3.7.0
-seaborn>=0.12.0
-openpyxl>=3.0.0  # Critical for Excel support
-plotly>=5.0.0
-fpdf2>=1.7.2
-openai>=1.0.0
-"""
