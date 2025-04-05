@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -7,161 +6,272 @@ import seaborn as sns
 from sklearn.decomposition import PCA
 from sklearn.cluster import KMeans
 from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.ensemble import RandomForestRegressor
+from scipy import stats
 import os
 from openai import OpenAI
 from io import BytesIO
 from datetime import datetime
 from fpdf import FPDF
+import plotly.express as px  # New for interactive plots
 
-st.set_page_config(page_title="SAMI Analyzer", layout="wide")
-st.title("📊 SAMI AI – Advanced Analytical Tool with PDF Export")
+# Configuration
+st.set_page_config(page_title="SAMI Analyzer Pro", layout="wide", page_icon="🔍")
+st.title("🔍 SAMI AI – Advanced Insights Engine with Automated Reporting")
 
+# Initialize client
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-uploaded_file = st.file_uploader("Upload your Excel or CSV file", type=["xlsx", "csv"])
-user_prompt = st.text_area("Ask a question about your data:", placeholder="e.g. What are the top trends by region?")
+# =============================================
+# NEW: Enhanced UI Components
+# =============================================
+with st.sidebar:
+    st.header("Analysis Configuration")
+    analysis_mode = st.radio(
+        "Mode:",
+        ["Exploratory", "Diagnostic", "Predictive"],
+        help="Exploratory: Basic stats\nDiagnostic: Deep insights\nPredictive: ML modeling"
+    )
+    
+    advanced_options = st.expander("Advanced Options")
+    with advanced_options:
+        confidence_level = st.slider("Confidence Level", 0.8, 0.99, 0.95)
+        max_categories = st.number_input("Max Categories for Plots", 10, 50, 20)
+        random_state = st.number_input("Random Seed", 1, 1000, 42)
 
-show_corr = st.checkbox("🔗 Correlation Matrix")
-show_pca = st.checkbox("🔬 PCA (2D Projection)")
-show_cluster = st.checkbox("🧭 KMeans Clustering")
-show_tfidf = st.checkbox("📝 TF-IDF on Text Columns")
-show_pdf = st.checkbox("📄 Export PDF Report")
-
-summary_output = ""
-
-def describe_columns(df):
-    report = []
-    for col in df.columns:
-        col_type = df[col].dtype
-        missing = df[col].isnull().mean()
-        unique = df[col].nunique()
-        if col_type == 'object':
-            top_values = df[col].value_counts().head(3).to_dict()
-            summary = f"Text | Unique: {unique} | Top: {top_values} | Missing: {missing:.1%}"
-        elif np.issubdtype(col_type, np.number):
-            desc = df[col].describe()
-            summary = f"Numeric | Mean: {desc['mean']:.2f} | Std: {desc['std']:.2f} | Min: {desc['min']:.2f} | Max: {desc['max']:.2f} | Missing: {missing:.1%}"
-        else:
-            summary = f"{col_type} | Unique: {unique} | Missing: {missing:.1%}"
-        report.append(f"- {col}: {summary}")
-    return "\n".join(report)
-
-def generate_visuals(df):
-    global summary_output
-    st.subheader("📊 Auto-Generated Visualizations")
+# =============================================
+# Enhanced Data Processing Functions
+# =============================================
+def detect_anomalies(df):
+    """Automatically detect outliers using IQR and Z-score methods"""
     numeric_cols = df.select_dtypes(include=np.number).columns
-    categorical_cols = df.select_dtypes(include='object').columns
-
+    anomalies = pd.DataFrame()
+    
     for col in numeric_cols:
-        fig, ax = plt.subplots()
-        df[col].dropna().hist(ax=ax, bins=20)
-        ax.set_title(f"Histogram of {col}")
-        st.pyplot(fig)
+        # IQR Method
+        Q1 = df[col].quantile(0.25)
+        Q3 = df[col].quantile(0.75)
+        IQR = Q3 - Q1
+        iqr_outliers = df[(df[col] < (Q1 - 1.5*IQR)) | (df[col] > (Q3 + 1.5*IQR))]
+        
+        # Z-score Method
+        z_scores = stats.zscore(df[col].dropna())
+        z_outliers = df[(abs(z_scores) > 3)]
+        
+        # Combine
+        col_anomalies = pd.concat([iqr_outliers, z_outliers]).drop_duplicates()
+        col_anomalies['Anomaly_Type'] = f"{col} Outlier"
+        anomalies = pd.concat([anomalies, col_anomalies])
+    
+    return anomalies.drop_duplicates()
 
-    for col in categorical_cols:
-        if df[col].nunique() <= 20:
-            fig, ax = plt.subplots()
-            df[col].value_counts().plot(kind="bar", ax=ax)
-            ax.set_title(f"Bar Plot of {col}")
-            st.pyplot(fig)
+def feature_importance_analysis(df, target_col=None):
+    """Calculate feature importance using Random Forest"""
+    numeric_cols = df.select_dtypes(include=np.number).columns
+    
+    if target_col and target_col in numeric_cols:
+        # Supervised importance
+        X = df[numeric_cols].drop(columns=[target_col]).fillna(0)
+        y = df[target_col]
+        
+        model = RandomForestRegressor(random_state=random_state)
+        model.fit(X, y)
+        importance = pd.DataFrame({
+            'Feature': X.columns,
+            'Importance': model.feature_importances_
+        }).sort_values('Importance', ascending=False)
+        
+        return importance, "supervised"
+    else:
+        # Unsupervised importance (variance)
+        importance = pd.DataFrame({
+            'Feature': numeric_cols,
+            'Importance': df[numeric_cols].var().values
+        }).sort_values('Importance', ascending=False)
+        
+        return importance, "unsupervised"
 
-    if show_corr and len(numeric_cols) >= 2:
-        st.subheader("🔗 Correlation Matrix")
-        corr = df[numeric_cols].corr()
-        fig, ax = plt.subplots(figsize=(8, 5))
-        sns.heatmap(corr, annot=True, fmt=".2f", cmap="coolwarm", ax=ax)
-        st.pyplot(fig)
-        summary_output += "\n\n**Correlation Matrix Head:**\n"
-        summary_output += str(corr.head())
+# =============================================
+# SUPERCHARGED Visualization Functions
+# =============================================
+def enhanced_correlation_analysis(df):
+    """Interactive correlation matrix with statistical significance"""
+    numeric_cols = df.select_dtypes(include=np.number).columns
+    
+    # Calculate correlation and p-values
+    corr_matrix = pd.DataFrame(index=numeric_cols, columns=numeric_cols)
+    p_matrix = pd.DataFrame(index=numeric_cols, columns=numeric_cols)
+    
+    for i in numeric_cols:
+        for j in numeric_cols:
+            corr, p_value = stats.pearsonr(df[i].dropna(), df[j].dropna())
+            corr_matrix.loc[i,j] = corr
+            p_matrix.loc[i,j] = p_value
+    
+    # Create mask for significant correlations
+    mask = np.triu(np.ones_like(corr_matrix, dtype=bool))
+    sig_mask = (p_matrix < (1-confidence_level)) & ~mask
+    
+    # Plot
+    plt.figure(figsize=(12,8))
+    sns.heatmap(
+        corr_matrix.astype(float), 
+        mask=mask,
+        annot=True, 
+        fmt=".2f", 
+        cmap="coolwarm",
+        center=0,
+        annot_kws={"size":9},
+        cbar_kws={"shrink":0.8}
+    )
+    
+    # Highlight significant correlations
+    for i in range(len(numeric_cols)):
+        for j in range(len(numeric_cols)):
+            if sig_mask.iloc[i,j]:
+                plt.text(j+0.5, i+0.5, "*", 
+                        ha="center", va="center", 
+                        color="black", fontsize=14)
+    
+    plt.title(f"Correlation Matrix (∗ = p < {1-confidence_level:.2f})")
+    st.pyplot(plt.gcf())
+    plt.clf()
+    
+    return corr_matrix, p_matrix
 
-    if show_pca and len(numeric_cols) >= 2:
-        st.subheader("🔬 PCA Projection (First 2 Components)")
-        pca = PCA(n_components=2)
-        reduced = pca.fit_transform(df[numeric_cols].dropna())
-        fig, ax = plt.subplots()
-        ax.scatter(reduced[:, 0], reduced[:, 1])
-        ax.set_xlabel("PC1")
-        ax.set_ylabel("PC2")
-        st.pyplot(fig)
-        summary_output += "\n\n**PCA Variance Explained:**\n"
-        summary_output += str(pca.explained_variance_ratio_)
-
-    if show_cluster and len(numeric_cols) >= 2:
-        st.subheader("🧭 KMeans Clustering (k=3)")
-        km = KMeans(n_clusters=3, random_state=42)
-        clusters = km.fit_predict(df[numeric_cols].dropna())
-        df['Cluster'] = clusters
-        fig, ax = plt.subplots()
-        sns.scatterplot(x=df[numeric_cols].iloc[:, 0], y=df[numeric_cols].iloc[:, 1], hue=clusters, palette="viridis", ax=ax)
-        st.pyplot(fig)
-        summary_output += "\n\n**Cluster Centers:**\n"
-        summary_output += str(km.cluster_centers_)
-
-    if show_tfidf:
-        text_cols = df.select_dtypes(include='object').columns
-        for col in text_cols:
-            st.subheader(f"📝 TF-IDF Terms: {col}")
-            text_data = df[col].dropna().astype(str)
-            if len(text_data) > 0:
-                vectorizer = TfidfVectorizer(max_features=10, stop_words='english')
-                tfidf = vectorizer.fit_transform(text_data)
-                terms = vectorizer.get_feature_names_out()
-                scores = tfidf.sum(axis=0).A1
-                top_terms = pd.Series(scores, index=terms).sort_values(ascending=False)
-                st.bar_chart(top_terms)
-                summary_output += f"\n\n**TF-IDF for {col}:**\n{top_terms.to_string()}"
-
-def generate_pdf(text, filename="sami_report.pdf"):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=10)
-    for line in text.splitlines():
-        pdf.multi_cell(0, 5, line)
-    buffer = BytesIO()
-    pdf.output(buffer)
-    buffer.seek(0)
-    return buffer
-
-if uploaded_file and st.button("Analyze"):
-    try:
-        df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith(".csv") else pd.read_excel(uploaded_file)
-        st.success(f"Loaded {df.shape[0]} rows × {df.shape[1]} columns")
-        st.dataframe(df.head())
-
-        st.subheader("📑 Column Summary")
-        column_summary = describe_columns(df)
-        st.text(column_summary)
-
-        summary_output += f"# SAMI Analyzer Report\n\n**Rows:** {df.shape[0]} | **Columns:** {df.shape[1]}\n"
-        summary_output += f"\n## Column Summary\n{column_summary}"
-
-        generate_visuals(df)
-
-        system_prompt = (
-            f"You are SAMI AI, a senior data analyst. Below is an overview of a dataset with {df.shape[0]} rows and {df.shape[1]} columns.\n"
-            f"Column breakdown:\n{column_summary}\n"
-            f"Please analyze the dataset using best practices for exploratory data analysis (EDA) "
-            f"and answer the user’s question or provide general insights."
+def interactive_distribution_plots(df):
+    """Plotly interactive distribution visualizations"""
+    numeric_cols = df.select_dtypes(include=np.number).columns
+    
+    for col in numeric_cols:
+        fig = px.histogram(
+            df, 
+            x=col,
+            nbins=50,
+            marginal="box",
+            title=f"Distribution of {col}",
+            hover_data=df.columns
         )
+        st.plotly_chart(fig, use_container_width=True)
 
-        with st.spinner("GPT is analyzing your dataset..."):
-            response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt or "Please summarize the dataset and highlight key insights."}
-                ]
-            )
-            st.subheader("💬 GPT Insight")
-            gpt_reply = response.choices[0].message.content
-            st.markdown(gpt_reply)
-            summary_output += f"\n\n## GPT Insight\n{gpt_reply}"
+# =============================================
+# MAIN ANALYSIS PIPELINE
+# =============================================
+uploaded_file = st.file_uploader("Upload your dataset", type=["xlsx", "csv", "parquet"])
+user_prompt = st.text_area("What insights would you like to discover?", 
+                          placeholder="E.g.: What are the key drivers of customer satisfaction?")
 
-        if show_pdf:
-            st.subheader("📄 Download PDF Report")
-            pdf_file = generate_pdf(summary_output)
-            filename = f"SAMI_Report_{datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.pdf"
-            st.download_button("📥 Download PDF", pdf_file, file_name=filename, mime="application/pdf")
-
-    except Exception as e:
-        st.error(f"Error: {e}")
+if uploaded_file and st.button("🚀 Analyze Data", type="primary"):
+    with st.spinner("Crunching numbers..."):
+        try:
+            # Load data
+            df = pd.read_csv(uploaded_file) if uploaded_file.name.endswith(".csv") else pd.read_excel(uploaded_file)
+            st.success(f"✅ Loaded {df.shape[0]:,} rows × {df.shape[1]:,} columns")
+            
+            # Data Quality Report
+            with st.expander("🔍 Data Quality Report", expanded=True):
+                missing_data = df.isnull().sum().rename("Missing Values")
+                data_types = df.dtypes.rename("Data Type")
+                uniqueness = df.nunique().rename("Unique Values")
+                quality_report = pd.concat([data_types, missing_data, uniqueness], axis=1)
+                st.dataframe(quality_report.style.background_gradient(cmap="Reds", subset=["Missing Values"]))
+            
+            # Automated Anomaly Detection
+            anomalies = detect_anomalies(df)
+            if not anomalies.empty:
+                st.warning(f"⚠️ Detected {len(anomalies)} potential anomalies")
+                with st.expander("View Anomalies"):
+                    st.dataframe(anomalies)
+            
+            # Enhanced Correlation Analysis
+            if len(df.select_dtypes(include=np.number).columns) >= 2:
+                st.subheader("🔗 Advanced Correlation Analysis")
+                corr_matrix, p_matrix = enhanced_correlation_analysis(df)
+            
+            # Interactive Distributions
+            st.subheader("📊 Interactive Distributions")
+            interactive_distribution_plots(df)
+            
+            # Feature Importance
+            numeric_cols = df.select_dtypes(include=np.number).columns
+            if len(numeric_cols) > 1:
+                st.subheader("🏆 Feature Importance")
+                target = st.selectbox("Select target variable (optional)", [None] + list(numeric_cols))
+                importance, imp_type = feature_importance_analysis(df, target)
+                
+                fig, ax = plt.subplots(figsize=(10,6))
+                sns.barplot(
+                    data=importance.head(10),
+                    x="Importance",
+                    y="Feature",
+                    palette="viridis",
+                    ax=ax
+                )
+                ax.set_title(f"Top 10 {'Predictive' if imp_type == 'supervised' else 'Variance-Based'} Features")
+                st.pyplot(fig)
+            
+            # GPT-4 Turbo Insight Generation
+            with st.spinner("🧠 Generating strategic insights..."):
+                # Prepare data summary for GPT
+                data_summary = f"""
+                Dataset Shape: {df.shape}
+                Columns: {', '.join(df.columns)}
+                Numeric Columns: {', '.join(df.select_dtypes(include=np.number).columns)}
+                Categorical Columns: {', '.join(df.select_dtypes(include='object').columns)}
+                
+                Sample Data:
+                {df.head(3).to_markdown()}
+                
+                Key Statistics:
+                {df.describe().to_markdown()}
+                """
+                
+                response = client.chat.completions.create(
+                    model="gpt-4-turbo",
+                    messages=[
+                        {
+                            "role": "system", 
+                            "content": """You are SAMI AI, an advanced analytics assistant. Analyze this dataset and provide:
+                            1. Key patterns and relationships
+                            2. Business implications
+                            3. Recommended next steps
+                            4. Potential pitfalls"""
+                        },
+                        {
+                            "role": "user",
+                            "content": f"Data Summary:\n{data_summary}\n\nUser Question: {user_prompt or 'Provide comprehensive analysis'}"
+                        }
+                    ],
+                    temperature=0.7,
+                    max_tokens=2000
+                )
+                
+                insights = response.choices[0].message.content
+                
+                st.subheader("💡 Strategic Insights")
+                st.markdown(insights)
+                
+                # PDF Report Generation
+                pdf = FPDF()
+                pdf.add_page()
+                pdf.set_font("Arial", size=12)
+                pdf.cell(200, 10, txt="SAMI AI Analysis Report", ln=True, align='C')
+                pdf.ln(10)
+                
+                # Add content to PDF
+                pdf.multi_cell(0, 5, insights)
+                
+                # Save to buffer
+                pdf_output = BytesIO()
+                pdf.output(pdf_output)
+                pdf_output.seek(0)
+                
+                st.download_button(
+                    "📥 Download Full Report",
+                    data=pdf_output,
+                    file_name=f"SAMI_Report_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                    mime="application/pdf"
+                )
+                
+        except Exception as e:
+            st.error(f"Analysis failed: {str(e)}")
