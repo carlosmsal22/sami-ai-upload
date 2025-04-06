@@ -9,125 +9,133 @@ if 'df' not in st.session_state:
     st.session_state.update({
         'df': None,
         'clean_df': None,
-        'numeric_cols': []
+        'numeric_cols': [],
+        'conversion_issues': []
     })
 
-# WinCross Configuration
-WINCROSS_HEADER_DEPTH = 3
-MIN_DATA_ROWS = 5
-
 def parse_wincross(file):
-    """Enhanced WinCross parser with numeric conversion"""
+    """Advanced WinCross parser with robust numeric conversion"""
     try:
-        # Read with no headers to find structure
-        raw_df = pd.read_excel(file, header=None)
-        
-        # Find first non-empty row
+        # First pass to detect header structure
+        raw_df = pd.read_excel(file, header=None, nrows=20)
         header_start = next(i for i, row in raw_df.iterrows() if row.notna().any())
         
         # Read with proper headers
         df = pd.read_excel(
             file,
-            header=list(range(header_start, header_start + WINCROSS_HEADER_DEPTH)),
+            header=list(range(header_start, header_start + 3)),  # WinCross typically has 3 header rows
             skiprows=list(range(header_start))
-        )
         
-        # Clean multi-index columns
+        # Clean column names
         df.columns = [
             ' | '.join(filter(None, (str(c).strip() for c in col)))
             for col in df.columns.values
         ]
         
-        # Convert all potential numeric columns
-        for col in df.columns:
-            # Handle percentage signs and other non-numeric characters
-            df[col] = df[col].apply(
-                lambda x: pd.to_numeric(re.sub(r'[^\d.]', '', str(x)), errors='coerce')
-                if isinstance(x, str) else x
-            )
-            
-            # Final conversion to numeric
-            if pd.api.types.is_numeric_dtype(df[col]):
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-        
-        return df.dropna(how='all').drop  (axis=1, how='all')
-    
+        return df.dropna(how='all').dropna(axis=1, how='all')
     except Exception as e:
-        st.error(f"Parsing failed: {str(e)}")
+        st.error(f"File parsing error: {str(e)}")
         return None
 
-def clean_data(df):
-    """Remove non-data rows and identify numeric columns"""
+def convert_to_numeric(series):
+    """Convert a series to numeric, handling WinCross formats"""
+    conversion_issues = []
+    
+    def converter(x):
+        if pd.isna(x):
+            return np.nan
+        try:
+            # Handle percentages (25% → 0.25)
+            if isinstance(x, str) and '%' in x:
+                return float(re.sub(r'[^\d.]', '', x)) / 100
+            # Handle comma numbers (1,000 → 1000)
+            if isinstance(x, str) and ',' in x:
+                return float(re.sub(r'[^\d.]', '', x))
+            return float(x)
+        except Exception as e:
+            conversion_issues.append(f"Couldn't convert {x}: {str(e)}")
+            return np.nan
+    
+    numeric_series = series.apply(converter)
+    return numeric_series, conversion_issues
+
+def analyze_data(df):
+    """Identify and convert numeric columns"""
     if df is None:
-        return None, []
+        return None, [], []
     
-    # Filter out metadata rows
-    clean_df = df[
-        ~df.apply(
-            lambda r: any(
-                x in str(r).lower() 
-                for x in ['banner', 'footnote', 'base', 'sig-testing', 'total']
-            ),
-            axis=1
-        )
-    ].reset_index(drop=True)
+    numeric_cols = []
+    all_conversion_issues = []
+    clean_df = df.copy()
     
-    # Identify numeric columns
-    numeric_cols = [
-        col for col in clean_df.columns 
-        if pd.api.types.is_numeric_dtype(clean_df[col])
-    ]
+    for col in clean_df.columns:
+        # Skip obvious non-numeric columns
+        if clean_df[col].dtype == object and not any(char.isdigit() for char in clean_df[col].astype(str).str.cat()):
+            continue
+            
+        numeric_series, issues = convert_to_numeric(clean_df[col])
+        if numeric_series.notna().any():  # If we got any numeric values
+            clean_df[col] = numeric_series
+            numeric_cols.append(col)
+        all_conversion_issues.extend(issues)
     
-    return clean_df, numeric_cols
+    return clean_df, numeric_cols, all_conversion_issues
 
 # Streamlit UI
 st.set_page_config(page_title="WinCross Analyzer Pro", layout="wide")
-st.title("📊 WinCross Professional Analyzer")
+st.title("🔍 WinCross Data Analyzer")
 
 # File Upload
 uploaded_file = st.file_uploader(
-    "Upload WinCross File", 
+    "Upload WinCross Crosstab", 
     type=["xlsx", "xls"],
-    help="Standard WinCross export files"
+    help="Upload standard WinCross export files"
 )
 
 if uploaded_file and st.session_state.df is None:
-    with st.spinner("Processing WinCross file..."):
+    with st.spinner("Analyzing WinCross file..."):
         df = parse_wincross(uploaded_file)
-        if df is not None and len(df) > MIN_DATA_ROWS:
-            clean_df, numeric_cols = clean_data(df)
+        if df is not None:
+            clean_df, numeric_cols, issues = analyze_data(df)
             st.session_state.df = df
             st.session_state.clean_df = clean_df
             st.session_state.numeric_cols = numeric_cols
-            st.success(f"✅ File loaded with {len(numeric_cols)} numeric columns")
-        else:
-            st.error("Failed to load valid data from file")
+            st.session_state.conversion_issues = issues
+            
+            if numeric_cols:
+                st.success(f"✅ Found {len(numeric_cols)} numeric columns")
+            else:
+                st.warning("⚠️ No numeric columns detected")
 
 # Analysis Tabs
 if st.session_state.df is not None:
-    tab1, tab2 = st.tabs(["Data Overview", "Advanced Analysis"])
+    tab1, tab2, tab3 = st.tabs(["Data Overview", "Numeric Analysis", "Debug"])
     
     with tab1:
-        st.subheader("Data Structure")
+        st.subheader("Raw Data Structure")
         st.write(f"Total Rows: {len(st.session_state.df)}")
-        st.write(f"Numeric Columns: {len(st.session_state.numeric_cols)}")
-        st.write("Sample Numeric Columns:", st.session_state.numeric_cols[:5])
+        st.write(f"Total Columns: {len(st.session_state.df.columns)}")
         st.dataframe(st.session_state.df.head(3))
     
     with tab2:
-        st.subheader("Statistical Analysis")
+        st.subheader("Numeric Data Analysis")
         
         if not st.session_state.numeric_cols:
-            st.warning("No numeric columns detected - cannot generate insights")
-            st.info("""
-            Common reasons:
-            1. Data contains percentages as text (e.g., '25%')
-            2. Numbers have special formatting
-            3. File uses non-standard structure
+            st.error("No numeric columns found in the data")
+            st.markdown("""
+            **Common Reasons:**
+            - Numbers stored as text (e.g., '25%', '1,000')
+            - Non-standard numeric formats
+            - Data contains mostly text responses
+            
+            **Try:**
+            1. Check your WinCross export settings
+            2. Export as plain numbers without formatting
+            3. Verify your data contains numeric values
             """)
         else:
             selected_col = st.selectbox(
-                "Select numeric column to analyze",
+                "Select numeric column to analyze", 
                 st.session_state.numeric_cols
             )
             
@@ -136,15 +144,16 @@ if st.session_state.df is not None:
                 st.metric("Average", f"{col_data.mean():.2f}")
                 st.metric("Minimum", f"{col_data.min():.2f}")
                 st.metric("Maximum", f"{col_data.max():.2f}")
-                
-                # Basic histogram
-                st.bar_chart(col_data.value_counts().sort_index())
+                st.bar_chart(col_data)
             else:
-                st.warning("Selected column contains no numeric data")
-
-# Debug
-with st.expander("Technical Details"):
-    if st.session_state.df is not None:
+                st.warning("Selected column contains no valid numeric data")
+    
+    with tab3:
+        st.subheader("Diagnostic Information")
         st.write("All Columns:", st.session_state.df.columns.tolist())
         st.write("Numeric Columns:", st.session_state.numeric_cols)
-        st.write("Data Types:", st.session_state.clean_df.dtypes.value_counts())
+        st.write("Conversion Issues:", st.session_state.conversion_issues)
+        st.write("Sample Values:", st.session_state.df.iloc[:, :5].head(3).to_dict())
+
+else:
+    st.info("Please upload a WinCross crosstab file to begin analysis")
