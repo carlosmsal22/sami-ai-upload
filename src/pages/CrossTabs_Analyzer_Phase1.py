@@ -29,14 +29,14 @@ def parse_wincross(file):
                 header_start = i
                 break
         
-        # Read with proper headers (FIXED PARENTHESES)
+        # Read with proper headers (FIXED - properly closed parentheses)
         df = pd.read_excel(
             file,
             header=list(range(header_start, header_start + WINCROSS_HEADER_DEPTH)),
-            skiprows=range(header_start)
+            skiprows=list(range(header_start))
         )
         
-        # Clean multi-index columns (FIXED PARENTHESES)
+        # Clean multi-index columns
         df.columns = [
             ' | '.join(filter(None, (str(c).strip() for c in col)))
             for col in df.columns.values
