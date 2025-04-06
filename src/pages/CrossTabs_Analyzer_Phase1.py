@@ -7,10 +7,9 @@ from io import BytesIO
 # Initialize session state
 if 'df' not in st.session_state:
     st.session_state.update({
-        'enable_insights': False,
-        'enable_enhanced_stats': False,
         'df': None,
-        'clean_df': None
+        'clean_df': None,
+        'numeric_cols': []
     })
 
 # WinCross Configuration
@@ -18,19 +17,15 @@ WINCROSS_HEADER_DEPTH = 3
 MIN_DATA_ROWS = 5
 
 def parse_wincross(file):
-    """Parse WinCross crosstab files"""
+    """Enhanced WinCross parser with numeric conversion"""
     try:
         # Read with no headers to find structure
         raw_df = pd.read_excel(file, header=None)
         
         # Find first non-empty row
-        header_start = 0
-        for i, row in raw_df.iterrows():
-            if row.notna().any():
-                header_start = i
-                break
+        header_start = next(i for i, row in raw_df.iterrows() if row.notna().any())
         
-        # Read with proper headers (FIXED PARENTHESES)
+        # Read with proper headers
         df = pd.read_excel(
             file,
             header=list(range(header_start, header_start + WINCROSS_HEADER_DEPTH)),
@@ -43,50 +38,50 @@ def parse_wincross(file):
             for col in df.columns.values
         ]
         
-        return df.dropna(how='all').dropna(axis=1, how='all')
+        # Convert all potential numeric columns
+        for col in df.columns:
+            # Handle percentage signs and other non-numeric characters
+            df[col] = df[col].apply(
+                lambda x: pd.to_numeric(re.sub(r'[^\d.]', '', str(x)), errors='coerce')
+                if isinstance(x, str) else x
+            )
+            
+            # Final conversion to numeric
+            if pd.api.types.is_numeric_dtype(df[col]):
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        return df.dropna(how='all').drop  (axis=1, how='all')
     
     except Exception as e:
         st.error(f"Parsing failed: {str(e)}")
         return None
 
-class WinCrossAnalysis:
-    @staticmethod
-    def clean_data(df):
-        """Remove non-data rows"""
-        if df is None:
-            return None
-        return df[
-            ~df.apply(
-                lambda r: any(
-                    x in str(r).lower() 
-                    for x in ['banner', 'footnote', 'base', 'sig-testing']
-                ),
-                axis=1
-            )
-        ].reset_index(drop=True)
-
-    @staticmethod
-    def generate_insights(df):
-        """Create automated insights"""
-        if df is None or len(df) == 0:
-            return []
-            
-        clean_df = WinCrossAnalysis.clean_data(df)
-        insights = []
-        
-        numeric_cols = clean_df.select_dtypes(include=np.number).columns
-        for col in numeric_cols[:5]:
-            parts = col.split(' | ')
-            label = f"{parts[0]} ({parts[1]})" if len(parts) > 1 else col
-            insights.append(
-                f"📊 {label}: Mean={clean_df[col].mean():.2f}, "
-                f"Range={clean_df[col].min():.2f}-{clean_df[col].max():.2f}"
-            )
-        
-        return insights if insights else ["No numeric data found for analysis"]
+def clean_data(df):
+    """Remove non-data rows and identify numeric columns"""
+    if df is None:
+        return None, []
+    
+    # Filter out metadata rows
+    clean_df = df[
+        ~df.apply(
+            lambda r: any(
+                x in str(r).lower() 
+                for x in ['banner', 'footnote', 'base', 'sig-testing', 'total']
+            ),
+            axis=1
+        )
+    ].reset_index(drop=True)
+    
+    # Identify numeric columns
+    numeric_cols = [
+        col for col in clean_df.columns 
+        if pd.api.types.is_numeric_dtype(clean_df[col])
+    ]
+    
+    return clean_df, numeric_cols
 
 # Streamlit UI
-st.set_page_config(page_title="WinCross Analyzer", layout="wide")
+st.set_page_config(page_title="WinCross Analyzer Pro", layout="wide")
 st.title("📊 WinCross Professional Analyzer")
 
 # File Upload
@@ -100,43 +95,56 @@ if uploaded_file and st.session_state.df is None:
     with st.spinner("Processing WinCross file..."):
         df = parse_wincross(uploaded_file)
         if df is not None and len(df) > MIN_DATA_ROWS:
+            clean_df, numeric_cols = clean_data(df)
             st.session_state.df = df
-            st.session_state.clean_df = WinCrossAnalysis.clean_data(df)
-            st.success("✅ File loaded successfully!")
+            st.session_state.clean_df = clean_df
+            st.session_state.numeric_cols = numeric_cols
+            st.success(f"✅ File loaded with {len(numeric_cols)} numeric columns")
         else:
             st.error("Failed to load valid data from file")
 
 # Analysis Tabs
 if st.session_state.df is not None:
-    tab1, tab2, tab3 = st.tabs(["Overview", "Analysis", "Export"])
+    tab1, tab2 = st.tabs(["Data Overview", "Advanced Analysis"])
     
     with tab1:
         st.subheader("Data Structure")
-        st.write(f"Rows: {len(st.session_state.df)} | Columns: {len(st.session_state.df.columns)}")
+        st.write(f"Total Rows: {len(st.session_state.df)}")
+        st.write(f"Numeric Columns: {len(st.session_state.numeric_cols)}")
+        st.write("Sample Numeric Columns:", st.session_state.numeric_cols[:5])
         st.dataframe(st.session_state.df.head(3))
     
     with tab2:
-        st.subheader("Advanced Analysis")
-        insights = WinCrossAnalysis.generate_insights(st.session_state.df)
-        if not insights or "No numeric data" in insights[0]:
-            st.warning(insights[0] if insights else "No data available for analysis")
+        st.subheader("Statistical Analysis")
+        
+        if not st.session_state.numeric_cols:
+            st.warning("No numeric columns detected - cannot generate insights")
+            st.info("""
+            Common reasons:
+            1. Data contains percentages as text (e.g., '25%')
+            2. Numbers have special formatting
+            3. File uses non-standard structure
+            """)
         else:
-            for insight in insights:
-                st.success(insight)
-    
-    with tab3:
-        st.subheader("Export Results")
-        if st.session_state.clean_df is not None:
-            csv = st.session_state.clean_df.to_csv(index=False)
-            st.download_button(
-                "Download CSV",
-                csv,
-                "wincross_data.csv",
-                "text/csv"
+            selected_col = st.selectbox(
+                "Select numeric column to analyze",
+                st.session_state.numeric_cols
             )
+            
+            col_data = st.session_state.clean_df[selected_col].dropna()
+            if len(col_data) > 0:
+                st.metric("Average", f"{col_data.mean():.2f}")
+                st.metric("Minimum", f"{col_data.min():.2f}")
+                st.metric("Maximum", f"{col_data.max():.2f}")
+                
+                # Basic histogram
+                st.bar_chart(col_data.value_counts().sort_index())
+            else:
+                st.warning("Selected column contains no numeric data")
 
 # Debug
 with st.expander("Technical Details"):
     if st.session_state.df is not None:
-        st.write("Numeric Columns:", 
-               st.session_state.clean_df.select_dtypes(include=np.number).columns.tolist())
+        st.write("All Columns:", st.session_state.df.columns.tolist())
+        st.write("Numeric Columns:", st.session_state.numeric_cols)
+        st.write("Data Types:", st.session_state.clean_df.dtypes.value_counts())
