@@ -1,10 +1,7 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import re
 from io import BytesIO
-import sys
-from pathlib import Path
 
 # Initialize session state
 if 'df' not in st.session_state:
@@ -26,17 +23,17 @@ def parse_wincross(file):
         raw_df = pd.read_excel(file, header=None)
         
         # Find first non-empty row
-        header_start = next(
-            (i for i, row in raw_df.iterrows() if row.notna().any()), 
-            0
-        )
+        header_start = 0
+        for i, row in raw_df.iterrows():
+            if row.notna().any():
+                header_start = i
+                break
         
         # Read with proper headers
         df = pd.read_excel(
             file,
             header=list(range(header_start, header_start + WINCROSS_HEADER_DEPTH)),
             skiprows=range(header_start)
-        )
         
         # Clean multi-index columns
         df.columns = [
@@ -54,6 +51,8 @@ class WinCrossAnalysis:
     @staticmethod
     def clean_data(df):
         """Remove non-data rows"""
+        if df is None:
+            return None
         return df[
             ~df.apply(
                 lambda r: any(
@@ -67,10 +66,14 @@ class WinCrossAnalysis:
     @staticmethod
     def generate_insights(df):
         """Create automated insights"""
+        if df is None or len(df) == 0:
+            return []
+            
         clean_df = WinCrossAnalysis.clean_data(df)
         insights = []
         
-        for col in clean_df.select_dtypes(include=np.number).columns[:5]:
+        numeric_cols = clean_df.select_dtypes(include=np.number).columns
+        for col in numeric_cols[:5]:  # Limit to first 5 columns
             parts = col.split(' | ')
             label = f"{parts[0]} ({parts[1]})" if len(parts) > 1 else col
             insights.append(
@@ -91,16 +94,18 @@ uploaded_file = st.file_uploader(
     help="Standard WinCross export files"
 )
 
-if uploaded_file and not st.session_state.df:
-    with st.spinner("Processing..."):
+if uploaded_file and st.session_state.df is None:
+    with st.spinner("Processing WinCross file..."):
         df = parse_wincross(uploaded_file)
         if df is not None and len(df) > MIN_DATA_ROWS:
             st.session_state.df = df
             st.session_state.clean_df = WinCrossAnalysis.clean_data(df)
-            st.success("File loaded successfully!")
+            st.success("✅ File loaded successfully!")
+        else:
+            st.error("Failed to load valid data from file")
 
 # Analysis Tabs
-if st.session_state.df:
+if st.session_state.df is not None:  # Fixed: Proper None check
     tab1, tab2, tab3 = st.tabs(["Overview", "Analysis", "Export"])
     
     with tab1:
@@ -112,18 +117,24 @@ if st.session_state.df:
         st.subheader("Advanced Analysis")
         if st.button("Generate Insights"):
             insights = WinCrossAnalysis.generate_insights(st.session_state.df)
-            for insight in insights:
-                st.success(insight)
+            if insights:
+                for insight in insights:
+                    st.success(insight)
+            else:
+                st.warning("No insights could be generated from this data")
     
     with tab3:
         st.subheader("Export Results")
-        if st.download_button(
-            "Download CSV",
-            st.session_state.clean_df.to_csv(index=False),
-            "wincross_data.csv",
-            "text/csv"
-        ):
-            st.success("Export started!")
+        if st.session_state.clean_df is not None:
+            csv = st.session_state.clean_df.to_csv(index=False)
+            st.download_button(
+                "Download CSV",
+                csv,
+                "wincross_data.csv",
+                "text/csv"
+            )
+        else:
+            st.warning("No clean data to export")
 
 else:
     st.warning("Please upload a WinCross crosstab file")
@@ -131,6 +142,7 @@ else:
 # Debug
 with st.expander("Session State"):
     st.write({
-        k: v for k, v in st.session_state.items() 
-        if not isinstance(v, pd.DataFrame)
+        k: type(v) for k, v in st.session_state.items()
     })
+    if st.session_state.df is not None:
+        st.write("Data Types:", st.session_state.df.dtypes.value_counts())
