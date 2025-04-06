@@ -13,6 +13,17 @@ if 'df' not in st.session_state:
         'conversion_issues': []
     })
 
+def clean_column_name(name):
+    """Clean WinCross column names for visualization compatibility"""
+    # Remove problematic characters and spaces
+    name = re.sub(r'[^a-zA-Z0-9_]', '_', str(name))
+    # Remove leading/trailing underscores
+    name = name.strip('_')
+    # Ensure it doesn't start with number
+    if name and name[0].isdigit():
+        name = f'col_{name}'
+    return name
+
 def parse_wincross(file):
     """Advanced WinCross parser with robust numeric conversion"""
     try:
@@ -20,16 +31,16 @@ def parse_wincross(file):
         raw_df = pd.read_excel(file, header=None, nrows=20)
         header_start = next(i for i, row in raw_df.iterrows() if row.notna().any())
         
-        # Read with proper headers (FIXED PARENTHESES)
+        # Read with proper headers
         df = pd.read_excel(
             file,
             header=list(range(header_start, header_start + 3)),
             skiprows=list(range(header_start))
         )
         
-        # Clean column names
+        # Clean column names for visualization compatibility
         df.columns = [
-            ' | '.join(filter(None, (str(c).strip() for c in col)))
+            clean_column_name('_'.join(filter(None, (str(c).strip() for c in col))))
             for col in df.columns.values
         ]
         
@@ -71,7 +82,8 @@ def analyze_data(df):
     
     for col in clean_df.columns:
         # Skip obvious non-numeric columns
-        if clean_df[col].dtype == object and not any(char.isdigit() for char in clean_df[col].astype(str).str.cat()):
+        if (clean_df[col].dtype == object and 
+            not any(char.isdigit() for char in clean_df[col].astype(str).str.cat())):
             continue
             
         numeric_series, issues = convert_to_numeric(clean_df[col])
@@ -142,10 +154,23 @@ if st.session_state.df is not None:
             
             col_data = st.session_state.clean_df[selected_col].dropna()
             if len(col_data) > 0:
-                st.metric("Average", f"{col_data.mean():.2f}")
-                st.metric("Minimum", f"{col_data.min():.2f}")
-                st.metric("Maximum", f"{col_data.max():.2f}")
-                st.bar_chart(col_data)
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    st.metric("Average", f"{col_data.mean():.2f}")
+                with col2:
+                    st.metric("Minimum", f"{col_data.min():.2f}")
+                with col3:
+                    st.metric("Maximum", f"{col_data.max():.2f}")
+                
+                # Create a simple bar chart with clean data
+                try:
+                    chart_df = pd.DataFrame({
+                        'value': col_data,
+                        'index': range(len(col_data))
+                    })
+                    st.bar_chart(chart_df.set_index('index')['value'])
+                except Exception as e:
+                    st.warning(f"Could not display chart: {str(e)}")
             else:
                 st.warning("Selected column contains no valid numeric data")
     
