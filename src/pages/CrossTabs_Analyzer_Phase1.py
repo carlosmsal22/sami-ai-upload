@@ -29,7 +29,7 @@ def parse_wincross(file):
                 header_start = i
                 break
         
-        # Read with proper headers
+        # Read with proper headers (fixed parenthesis)
         df = pd.read_excel(
             file,
             header=list(range(header_start, header_start + WINCROSS_HEADER_DEPTH)),
@@ -105,7 +105,7 @@ if uploaded_file and st.session_state.df is None:
             st.error("Failed to load valid data from file")
 
 # Analysis Tabs
-if st.session_state.df is not None:  # Fixed: Proper None check
+if st.session_state.df is not None:
     tab1, tab2, tab3 = st.tabs(["Overview", "Analysis", "Export"])
     
     with tab1:
@@ -140,9 +140,8 @@ else:
     st.warning("Please upload a WinCross crosstab file")
 
 # Debug
-with st.expander("Session State"):
-    st.write({
-        k: type(v) for k, v in st.session_state.items()
-    })
+with st.expander("Technical Details"):
+    st.write("DataFrame loaded:", st.session_state.df is not None)
     if st.session_state.df is not None:
+        st.write("Columns:", list(st.session_state.df.columns[:5]))
         st.write("Data Types:", st.session_state.df.dtypes.value_counts())
