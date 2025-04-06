@@ -1,88 +1,97 @@
-
 import streamlit as st
 import pandas as pd
 from io import BytesIO
 import re
-import openpyxl
 from openai import OpenAI
 import os
 
 st.set_page_config(page_title="📊 Enhanced CrossTabs Analyzer", layout="wide")
 st.title("📊 Enhanced CrossTabs Analyzer")
 
-st.markdown("Upload your WinCross-style Excel file and generate deep insights + export-ready formatted tables.")
-
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx"])
+uploaded_file = st.file_uploader("Upload WinCross-Style Excel File", type=["xlsx"])
 if uploaded_file:
     try:
-        df = pd.read_excel(uploaded_file, sheet_name="Banner", header=None)
-        st.success("✅ Loaded 'Banner' sheet successfully")
+        xls = pd.ExcelFile(uploaded_file)
+        if "Banner" not in xls.sheet_names:
+            st.error("❌ Could not find sheet named 'Banner'")
+        else:
+            df = pd.read_excel(uploaded_file, sheet_name="Banner", header=None)
+            st.success("✅ Loaded 'Banner' sheet successfully")
 
-        def parse_wincross_tables(df):
-            tables = []
-            row = 0
-            while row < len(df):
-                if "Table Title" in str(df.iloc[row, 1]):
-                    title = str(df.iloc[row + 1, 1])
-                    base_counts = df.iloc[row + 6, 3:7].tolist()
-                    segments = [f"Segment {i+1} (n={int(v)})" if pd.notnull(v) else f"Segment {i+1}" for i, v in enumerate(base_counts)]
-                    rows = []
-                    sub_row = row + 8
-                    while sub_row + 2 < len(df) and isinstance(df.iloc[sub_row, 2], str):
-                        try:
-                            label = df.iloc[sub_row, 2]
-                            freqs = [df.iloc[sub_row, i] for i in range(3, 7)]
-                            percs = [df.iloc[sub_row + 1, i] for i in range(3, 7)]
-                            sigs = df.iloc[sub_row + 2, 3:7].tolist()
-                            rowdata = [label] + [f"{float(p)*100:.1f}% ({int(f)})" if pd.notna(p) and pd.notna(f) else "" for p, f in zip(percs, freqs)] + [", ".join([str(s) for s in sigs if pd.notna(s)])]
-                            rows.append(rowdata)
-                            sub_row += 3
-                        except:
-                            break
-                    parsed_df = pd.DataFrame(rows, columns=["Metric"] + segments + ["Sig"])
-                    tables.append((title, parsed_df))
-                    row = sub_row
-                else:
-                    row += 1
-            return tables
+            # Parse tables from "Banner"
+            def extract_tables(df):
+                tables = []
+                i = 0
+                while i < len(df):
+                    if isinstance(df.iloc[i, 1], str) and "Table Title" in df.iloc[i, 1]:
+                        title = df.iloc[i + 1, 1]
+                        base_counts = df.iloc[i + 6, 3:7].tolist()
+                        labels = [
+                            f"{n} (n={int(c)})" if pd.notnull(c) else f"{n} (n=NA)"
+                            for n, c in zip(["Frugal Basics", "Resourceful Savers", "Performance Enthusiasts", "Urban Techies"], base_counts)
+                        ]
+                        rows = []
+                        r = i + 8
+                        while r + 2 < len(df) and isinstance(df.iloc[r, 2], str):
+                            label = df.iloc[r, 2]
+                            try:
+                                freqs = [df.iloc[r, j] for j in range(3, 7)]
+                                percs = [df.iloc[r + 1, j] for j in range(3, 7)]
+                                sigs = df.iloc[r + 2, 3:7].tolist()
+                                values = [
+                                    f"{float(p)*100:.1f}% ({int(f)})"
+                                    if pd.notna(p) and pd.notna(f) else ""
+                                    for p, f in zip(percs, freqs)
+                                ]
+                                sig_text = ", ".join([str(s) for s in sigs if isinstance(s, str)])
+                                rows.append([label] + values + [sig_text])
+                            except:
+                                break
+                            r += 3
+                        tdf = pd.DataFrame(rows, columns=["Metric"] + labels + ["Sig"])
+                        tables.append((title, tdf))
+                        i = r
+                    else:
+                        i += 1
+                return tables
 
-        parsed_tables = parse_wincross_tables(df)
-        options = [f"Table {i+1}: {title[:40]}" for i, (title, _) in enumerate(parsed_tables)]
-        selected_idx = st.selectbox("Select a table to preview", options=range(len(parsed_tables)), format_func=lambda x: options[x])
-        selected_title, selected_df = parsed_tables[selected_idx]
+            tables = extract_tables(df)
+            if not tables:
+                st.warning("⚠️ No valid tables extracted.")
+            else:
+                options = [f"Table {i+1}: {title[:40]}" for i, (title, _) in enumerate(tables)]
+                selected = st.selectbox("Select a table to preview", range(len(tables)), format_func=lambda i: options[i])
+                title, tdf = tables[selected]
+                st.subheader(f"📘 {title}")
+                st.dataframe(tdf)
 
-        st.subheader(f"📘 {selected_title}")
-        st.dataframe(selected_df)
+                # GPT Summary
+                try:
+                    st.markdown("### 🧠 Executive Summary")
+                    gpt_prompt = f"""You are an executive insight generator. Analyze this cross-tab table and summarize key differences across segments.
 
-        # GPT Analysis
-        with st.spinner("Generating GPT insights..."):
-            prompt = f"Analyze the following cross-tab table:
-{selected_df.head(5).to_markdown()}
-Provide key insights and business implications."
-            response = client.chat.completions.create(
-                model="gpt-4",
-                messages=[
-                    {"role": "system", "content": "You are a senior data strategist."},
-                    {"role": "user", "content": prompt}
-                ]
-            )
-            summary = response.choices[0].message.content
-            st.markdown("### 🧠 Executive Summary")
-            st.markdown(summary)
+{tdf.to_markdown()}"""
+                    with st.spinner("Generating GPT summary..."):
+                        response = client.chat.completions.create(
+                            model="gpt-3.5-turbo",
+                            messages=[
+                                {"role": "system", "content": "You are a senior research strategist."},
+                                {"role": "user", "content": gpt_prompt}
+                            ]
+                        )
+                        st.markdown(response.choices[0].message.content)
+                except Exception as e:
+                    st.error(f"GPT Error: {e}")
 
-        # Download Excel button
-        excel_buffer = BytesIO()
-        with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-            selected_df.to_excel(writer, index=False, sheet_name="Segment Table")
-        excel_buffer.seek(0)
-        st.download_button(
-            label="📥 Download Segment Table (Excel)",
-            data=excel_buffer,
-            file_name="Segment_Table.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
+                # Export
+                st.download_button(
+                    "📥 Download Segment Table (Excel)",
+                    data=tdf.to_csv(index=False),
+                    file_name=f"{title.replace(' ', '_')}.csv",
+                    mime="text/csv"
+                )
 
     except Exception as e:
-        st.error(f"❌ Error reading sheet: {e}")
+        st.error(f"❌ Failed to load file: {e}")
