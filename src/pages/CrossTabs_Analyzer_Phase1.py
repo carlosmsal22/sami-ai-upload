@@ -1,145 +1,104 @@
 import streamlit as st
 import pandas as pd
-import sys
-from pathlib import Path
 from io import BytesIO
+import re
+import tempfile
+import os
+from openai import OpenAI
 
-# Add the src directory to Python path
-sys.path.append(str(Path(__file__).parent.parent))
+st.set_page_config(page_title="📊 Enhanced CrossTabs Analyzer", layout="wide")
+st.title("📊 Enhanced CrossTabs Analyzer")
 
-# Import from utils
-from utils.stats_helpers import run_group_comparison, run_z_chi_tests, get_descriptive_stats
+# Initialize OpenAI client
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-st.set_page_config(page_title="CrossTabs Analyzer", layout="wide")
-st.title("📊 CrossTabs Analyzer")
+st.markdown("""
+Upload your WinCross-style Excel file and generate deep insights + export-ready formatted tables.
+""")
 
-st.markdown("---")
-tabs = st.tabs(["📘 Frequency Tables", "🔍 Group Comparisons", "🧪 Z / Chi-Square Tests", "📏 Descriptive Stats", "📄 Export Tools"])
-
-# Initialize session state
-if "df" not in st.session_state:
-    st.session_state["df"] = None
-
-# File uploader with enhanced error handling
-uploaded_file = st.file_uploader(
-    "Upload a cross-tabulated file (Excel format)", 
-    type=["xlsx", "xls"],
-    key="file_uploader"
-)
-
-flatten = st.checkbox("🔄 Flatten MultiIndex Columns (Recommended)", value=True)
+uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx"])
 
 if uploaded_file:
-    try:
-        df = pd.read_excel(uploaded_file, header=[0, 1, 2])
-        if flatten and isinstance(df.columns, pd.MultiIndex):
-            df.columns = ['_'.join(filter(None, map(str, col))).strip() for col in df.columns.values]
-        st.session_state["df"] = df
-        st.success("✅ File loaded successfully!")
+    df = pd.read_excel(uploaded_file, sheet_name="Banner", header=None)
+    st.success("✅ Loaded 'Banner' sheet successfully")
 
-        with st.expander("🔍 Debug: Show Column Structure"):
-            st.write("Columns:", df.columns.tolist())
-            st.write("Shape:", df.shape)
-            st.write("Data Sample:", df.head(3))
+    def parse_tables(df):
+        segment_names = ["Frugal Basics", "Resourceful Savers", "Performance Enthusiasts", "Urban Techies"]
+        tables = []
+        row = 1
+        while row < len(df):
+            if "Table Title" in str(df.iloc[row, 1]):
+                table_title = str(df.iloc[row + 1, 1])
+                base_counts = df.iloc[row + 6, 3:7].tolist()
+                segment_labels = [
+                    f"{name} (n={int(count)})" if pd.notnull(count) else f"{name} (n=NA)"
+                    for name, count in zip(segment_names, base_counts)
+                ]
+                table_rows = []
+                sub_row = row + 8
+                while sub_row + 2 < len(df) and isinstance(df.iloc[sub_row, 2], str):
+                    metric_label = df.iloc[sub_row, 2]
+                    try:
+                        freqs = [df.iloc[sub_row, col] for col in range(3, 7)]
+                        percs = [df.iloc[sub_row + 1, col] for col in range(3, 7)]
+                        sigs_raw = df.iloc[sub_row + 2, 3:7].tolist()
+                        values = [
+                            f"{float(p)*100:.1f}% ({int(f)})"
+                            if pd.notna(p) and pd.notna(f) and p != '-' and f != '-'
+                            else ""
+                            for p, f in zip(percs, freqs)
+                        ]
+                        sig_combined = ', '.join([str(sig) for sig in sigs_raw if pd.notna(sig) and isinstance(sig, str)])
+                        table_rows.append([metric_label] + values + [sig_combined])
+                    except:
+                        break
+                    sub_row += 3
+                table_df = pd.DataFrame(table_rows, columns=["Metric"] + segment_labels + ["Sig"])
+                tables.append((table_title, table_df))
+                row = sub_row
+            else:
+                row += 1
+        return tables
 
-    except Exception as e:
-        st.error(f"❌ Error reading file: {str(e)}")
-        st.session_state["df"] = None
+    def export_table(table_df):
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            table_df.to_excel(writer, sheet_name='Segment Table', index=False)
+        output.seek(0)
+        return output
 
-# Reset button
-if st.button("🔄 Reset Data"):
-    st.session_state["df"] = None
-    st.rerun()
-
-# Main analysis tabs
-if st.session_state["df"] is not None:
-    df = st.session_state["df"]
-
-    with tabs[0]:
-        st.subheader("📘 Frequency Table")
-        st.dataframe(df, use_container_width=True)
-
-        with st.expander("🔢 Value Counts"):
-            for col in df.columns:
-                st.write(f"**{col}**")
-                st.dataframe(df[col].value_counts(dropna=False))
-
-    with tabs[1]:
-        st.subheader("🔍 Compare Groups")
-        columns = df.columns.tolist()
-
-        col1, col2 = st.columns(2)
-        with col1:
-            group_col = st.selectbox("Select Group Column (Banner)", columns, key="group")
-        with col2:
-            metric_col = st.selectbox("Select Metric Column", columns, key="metric")
-
-        if st.button("Run Comparison"):
-            try:
-                result = run_group_comparison(df, group_col, metric_col)
-                st.dataframe(result)
-                st.download_button("Download Comparison Results", result.to_csv(index=False), "group_comparison.csv", "text/csv")
-            except Exception as e:
-                st.error(f"Comparison failed: {str(e)}")
-
-    with tabs[2]:
-        st.subheader("🧪 Z-Test / Chi-Square")
-        if st.button("Run Statistical Tests"):
-            try:
-                result = run_z_chi_tests(df)
-                st.dataframe(result)
-                st.download_button("Download Z/Chi Results", result.to_csv(index=False), "z_chi_results.csv", "text/csv")
-            except Exception as e:
-                st.error(f"Tests failed: {str(e)}")
-
-    with tabs[3]:
-        st.subheader("📏 Descriptive Stats")
-        numeric_cols = df.select_dtypes(include='number').columns.tolist()
-
-        if not numeric_cols:
-            st.warning("⚠️ No numeric columns found.")
-        else:
-            if st.button("Generate Summary Statistics"):
-                try:
-                    result = get_descriptive_stats(df[numeric_cols])
-                    st.dataframe(result)
-                    st.download_button("Download Descriptive Stats", result.to_csv(index=False), "descriptive_stats.csv", "text/csv")
-                except Exception as e:
-                    st.error(f"Stats generation failed: {str(e)}")
-
-    with tabs[4]:
-        st.subheader("📤 Export Tools")
-
+    def gpt_summary(table_title, table_df):
         try:
-            st.download_button(
-                label="Download Full CSV",
-                data=df.to_csv(index=False),
-                file_name="crosstabs_data.csv",
-                mime="text/csv"
+            preview = table_df.head(4).to_markdown()
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "You are a research strategist analyzing crosstab tables."},
+                    {"role": "user", "content": f"Here is a table titled '{table_title}'. Provide a summary of the key segment differences and strategic takeaways.\n\n{preview}"}
+                ]
             )
-
-            excel_buffer = BytesIO()
-            with pd.ExcelWriter(excel_buffer, engine='openpyxl') as writer:
-                export_df = df.copy()
-                if isinstance(export_df.columns, pd.MultiIndex):
-                    export_df.columns = ['_'.join(filter(None, map(str, col))).strip() 
-                                          for col in export_df.columns.values]
-                export_df.to_excel(writer, index=False, sheet_name="Data")
-            excel_buffer.seek(0)
-
-            st.download_button(
-                label="Download Excel",
-                data=excel_buffer,
-                file_name="crosstabs_data.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-
+            return response.choices[0].message.content
         except Exception as e:
-            st.error(f"Export failed: {str(e)}")
+            return f"Error generating GPT summary: {e}"
 
-else:
-    st.warning("⚠️ Please upload a file to begin analysis")
+    tables = parse_tables(df)
+    table_titles = [f"Table {i+1}: {t[0][:60]}" for i, t in enumerate(tables)]
+    selected_idx = st.selectbox("Select a table to preview", options=range(len(tables)), format_func=lambda x: table_titles[x])
 
-# Optional debug section
-with st.expander("🐛 Debug: Session State"):
-    st.write(st.session_state)
+    # Display selected table
+    table_title, table_df = tables[selected_idx]
+    st.subheader(f"📘 {table_title}")
+    st.dataframe(table_df, use_container_width=True)
+
+    # GPT Summary
+    st.subheader("🧠 Executive Summary")
+    st.markdown(gpt_summary(table_title, table_df))
+
+    # Export Button
+    xls_bytes = export_table(table_df)
+    st.download_button(
+        "📥 Download Segment Table (Excel)",
+        data=xls_bytes,
+        file_name="Formatted_Segment_Table.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
