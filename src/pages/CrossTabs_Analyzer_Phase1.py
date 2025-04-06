@@ -5,6 +5,13 @@ from pathlib import Path
 from io import BytesIO
 import matplotlib.pyplot as plt
 
+# ==============================================
+# NEW: Session State Initialization (Critical Fix)
+# ==============================================
+if 'enable_insights' not in st.session_state:
+    st.session_state.enable_insights = False
+    st.session_state.enable_enhanced_stats = False
+
 # Add the src directory to Python path
 sys.path.append(str(Path(__file__).parent.parent))
 
@@ -15,7 +22,7 @@ st.set_page_config(page_title="🚀 Enhanced CrossTabs Analyzer", layout="wide")
 st.title("🚀 Enhanced CrossTabs Analyzer")
 
 # ==============================================
-# NEW: Plugin System (Fixed Version)
+# NEW: Plugin System
 # ==============================================
 class AnalysisPlugins:
     """Container for all enhanced analysis methods"""
@@ -69,7 +76,7 @@ class AnalysisPlugins:
             output = BytesIO()
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
                 export_df.to_excel(writer, index=False)
-                if st.session_state.get("enable_insights", False):
+                if st.session_state.enable_insights:
                     insights = AnalysisPlugins.insight_generator(df)
                     pd.DataFrame(insights, columns=["Insights"]).to_excel(
                         writer, sheet_name='Insights', index=False
@@ -81,26 +88,12 @@ class AnalysisPlugins:
 # ==============================================
 st.markdown("---")
 
-# Initialize session state (Fixed version)
-if "df" not in st.session_state:
-    st.session_state.update({
-        "df": None,
-        "enable_insights": False,
-        "enable_enhanced_stats": False
-    })
-
-# Feature Toggles in Sidebar (Fixed persistence)
+# NEW: Sidebar Toggles (Fixed Version)
 with st.sidebar.expander("⚙️ Advanced Features"):
-    st.session_state.enable_insights = st.checkbox(
-        "Enable Auto-Insights", 
-        value=st.session_state.enable_insights
-    )
-    st.session_state.enable_enhanced_stats = st.checkbox(
-        "Enhanced Statistics", 
-        value=st.session_state.enable_enhanced_stats
-    )
+    st.checkbox("Enable Auto-Insights", key="enable_insights")
+    st.checkbox("Enhanced Statistics", key="enable_enhanced_stats")
 
-# File Uploader (Original + Enhanced Error Handling)
+# Original file uploader with error handling
 uploaded_file = st.file_uploader(
     "Upload a cross-tabulated file (Excel format)", 
     type=["xlsx", "xls"],
@@ -128,7 +121,7 @@ if st.button("🔄 Reset Data"):
     st.rerun()
 
 # ==============================================
-# Enhanced Tab System (Fixed Implementation)
+# Enhanced Tab System
 # ==============================================
 tabs = st.tabs([
     "📘 Frequency Tables", 
