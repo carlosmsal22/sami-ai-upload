@@ -15,7 +15,7 @@ st.set_page_config(page_title="🚀 Enhanced CrossTabs Analyzer", layout="wide")
 st.title("🚀 Enhanced CrossTabs Analyzer")
 
 # ==============================================
-# NEW: Plugin System
+# NEW: Plugin System (Fixed Version)
 # ==============================================
 class AnalysisPlugins:
     """Container for all enhanced analysis methods"""
@@ -39,9 +39,10 @@ class AnalysisPlugins:
         # Categorical insights
         cat_cols = df.select_dtypes(include=['object', 'category']).columns
         for col in cat_cols:
-            top_val = df[col].mode()[0]
-            freq = df[col].value_counts(normalize=True).iloc[0]
-            insights.append(f"🏆 **{col}**: Most frequent value is '{top_val}' ({freq:.1%})")
+            if df[col].nunique() < 20:  # Only for reasonable cardinality
+                top_val = df[col].mode()[0]
+                freq = df[col].value_counts(normalize=True).iloc[0]
+                insights.append(f"🏆 **{col}**: Most frequent value is '{top_val}' ({freq:.1%})")
         
         # Numerical insights
         num_cols = df.select_dtypes(include=['number']).columns
@@ -53,25 +54,34 @@ class AnalysisPlugins:
     
     @staticmethod
     def enhanced_export(df, format='csv'):
-        """Improved export functionality"""
+        """Improved export functionality with MultiIndex support"""
+        # Create a flattened version for exports
+        if isinstance(df.columns, pd.MultiIndex):
+            export_df = df.copy()
+            export_df.columns = ['_'.join(filter(None, map(str, col))).strip() 
+                             for col in export_df.columns.values]
+        else:
+            export_df = df
+            
         if format == 'csv':
-            return df.to_csv(index=False)
+            return export_df.to_csv(index=False)
         elif format == 'excel':
             output = BytesIO()
             with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                df.to_excel(writer, index=False)
-                # Add summary sheet
-                pd.DataFrame(AnalysisPlugins.insight_generator(df)).to_excel(
-                    writer, sheet_name='Insights', index=False
-                )
+                export_df.to_excel(writer, index=False)
+                if st.session_state.get("enable_insights", False):
+                    insights = AnalysisPlugins.insight_generator(df)
+                    pd.DataFrame(insights, columns=["Insights"]).to_excel(
+                        writer, sheet_name='Insights', index=False
+                    )
             return output.getvalue()
 
 # ==============================================
-# Original Core Functionality with Upgrades
+# Core Application Setup
 # ==============================================
 st.markdown("---")
 
-# Initialize session state with new fields
+# Initialize session state (Fixed version)
 if "df" not in st.session_state:
     st.session_state.update({
         "df": None,
@@ -79,18 +89,18 @@ if "df" not in st.session_state:
         "enable_enhanced_stats": False
     })
 
-# NEW: Feature Toggles in Sidebar
+# Feature Toggles in Sidebar (Fixed persistence)
 with st.sidebar.expander("⚙️ Advanced Features"):
     st.session_state.enable_insights = st.checkbox(
         "Enable Auto-Insights", 
-        st.session_state.enable_insights
+        value=st.session_state.enable_insights
     )
     st.session_state.enable_enhanced_stats = st.checkbox(
         "Enhanced Statistics", 
-        st.session_state.enable_enhanced_stats
+        value=st.session_state.enable_enhanced_stats
     )
 
-# Original file uploader with error handling
+# File Uploader (Original + Enhanced Error Handling)
 uploaded_file = st.file_uploader(
     "Upload a cross-tabulated file (Excel format)", 
     type=["xlsx", "xls"],
@@ -112,13 +122,13 @@ if uploaded_file:
         st.error(f"❌ Error reading file: {str(e)}")
         st.session_state["df"] = None
 
-# Reset button (original)
+# Reset button (Original)
 if st.button("🔄 Reset Data"):
     st.session_state["df"] = None
     st.rerun()
 
 # ==============================================
-# Enhanced Tab System
+# Enhanced Tab System (Fixed Implementation)
 # ==============================================
 tabs = st.tabs([
     "📘 Frequency Tables", 
@@ -180,8 +190,11 @@ if st.session_state["df"] is not None:
                 st.dataframe(stats['basic'])
                 
                 with st.expander("🔍 Detailed Metadata"):
+                    st.write("Missing Values:")
                     st.dataframe(stats['missing'])
+                    st.write("Data Types:")
                     st.dataframe(stats['dtypes'])
+                    st.write("Unique Values:")
                     st.dataframe(stats['unique'])
                     
             except Exception as e:
@@ -194,40 +207,47 @@ if st.session_state["df"] is not None:
                 except Exception as e:
                     st.error(f"Stats generation failed: {str(e)}")
 
-    # 5. NEW: Auto Insights Tab
+    # 5. NEW: Auto Insights Tab (Fixed Implementation)
     with tabs[4]:
         st.subheader("💡 Automated Insights")
         
         if st.session_state.enable_insights:
             try:
                 insights = AnalysisPlugins.insight_generator(df)
-                for insight in insights:
-                    st.success(insight)
+                
+                if not insights:
+                    st.info("No automatic insights could be generated from this data")
+                else:
+                    for insight in insights:
+                        st.success(insight)
                     
-                with st.expander("📊 Visualization"):
-                    col = st.selectbox("Select column to visualize", df.columns)
-                    if pd.api.types.is_numeric_dtype(df[col]):
+                    with st.expander("📊 Visualization"):
+                        col = st.selectbox("Select column to visualize", df.columns)
                         fig, ax = plt.subplots()
-                        df[col].plot(kind='hist', ax=ax)
-                        st.pyplot(fig)
-                    else:
-                        fig, ax = plt.subplots()
-                        df[col].value_counts().plot(kind='bar', ax=ax)
+                        
+                        if pd.api.types.is_numeric_dtype(df[col]):
+                            df[col].plot(kind='hist', ax=ax)
+                            ax.set_title(f"Distribution of {col}")
+                        else:
+                            df[col].value_counts().head(10).plot(kind='bar', ax=ax)
+                            ax.set_title(f"Top Values in {col}")
+                            
                         st.pyplot(fig)
                         
             except Exception as e:
                 st.error(f"Insight generation failed: {str(e)}")
         else:
-            st.warning("Enable 'Auto-Insights' in sidebar to use this feature")
+            st.info("ℹ️ Enable 'Auto-Insights' in sidebar to use this feature")
 
-    # 6. Enhanced Export Tools
+    # 6. Enhanced Export Tools (Fixed Implementation)
     with tabs[5]:
         st.subheader("📤 Export Tools")
         
         export_format = st.radio(
             "Select export format",
             ["CSV", "Excel"],
-            horizontal=True
+            horizontal=True,
+            index=0
         )
         
         if st.session_state.enable_insights:
@@ -237,23 +257,22 @@ if st.session_state["df"] is not None:
         
         try:
             if export_format == "CSV":
-                data = AnalysisPlugins.enhanced_export(df, 'csv')
                 st.download_button(
                     label="Download CSV",
-                    data=data,
-                    file_name="enhanced_export.csv",
+                    data=AnalysisPlugins.enhanced_export(df, 'csv'),
+                    file_name="crosstab_data.csv",
                     mime="text/csv"
                 )
             else:
-                data = AnalysisPlugins.enhanced_export(df, 'excel')
                 st.download_button(
                     label="Download Excel",
-                    data=data,
-                    file_name="enhanced_export.xlsx",
+                    data=AnalysisPlugins.enhanced_export(df, 'excel'),
+                    file_name="crosstab_data.xlsx",
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
         except Exception as e:
             st.error(f"Export failed: {str(e)}")
+            st.info("💡 Tip: Try exporting as CSV if Excel fails with complex tables")
 
 else:
     st.warning("⚠️ Please upload a file to begin analysis")
