@@ -20,11 +20,12 @@ def parse_wincross(file):
         raw_df = pd.read_excel(file, header=None, nrows=20)
         header_start = next(i for i, row in raw_df.iterrows() if row.notna().any())
         
-        # Read with proper headers
+        # Read with proper headers (FIXED PARENTHESES)
         df = pd.read_excel(
             file,
-            header=list(range(header_start, header_start + 3)),  # WinCross typically has 3 header rows
+            header=list(range(header_start, header_start + 3)),
             skiprows=list(range(header_start))
+        )
         
         # Clean column names
         df.columns = [
