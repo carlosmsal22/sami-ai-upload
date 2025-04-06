@@ -1,171 +1,250 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import sys
 from pathlib import Path
 from io import BytesIO
 import matplotlib.pyplot as plt
 
 # ==============================================
+# WinCross-Specific Configuration
+# ==============================================
+WINCROSS_HEADER_ROWS = 3  # Typical WinCross header depth
+MIN_DATA_ROWS = 5  # Minimum rows to consider valid data
+
+# ==============================================
 # Session State Initialization
 # ==============================================
-if 'enable_insights' not in st.session_state:
+if 'df' not in st.session_state:
     st.session_state.update({
         'enable_insights': False,
         'enable_enhanced_stats': False,
-        'df': None
+        'df': None,
+        'original_columns': None
     })
 
-# Add the src directory to Python path
-sys.path.append(str(Path(__file__).parent.parent))
-
-# Import from utils
-from utils.stats_helpers import run_group_comparison, run_z_chi_tests, get_descriptive_stats
-
-st.set_page_config(page_title="🚀 Enhanced CrossTabs Analyzer", layout="wide")
-st.title("🚀 Enhanced CrossTabs Analyzer")
-
 # ==============================================
-# Enhanced File Uploader (400 Error Fix)
+# Enhanced WinCross Parser
 # ==============================================
-def safe_file_upload():
-    """Handles file uploads with proper error handling"""
+def parse_wincross(file):
+    """Specialized parser for WinCross crosstab format"""
     try:
-        uploaded_file = st.file_uploader(
-            "Upload a cross-tabulated file (Excel format)", 
-            type=["xlsx", "xls"],
-            key="file_uploader_v2",  # New key to avoid conflicts
-            accept_multiple_files=False
+        # First pass to detect header structure
+        temp_df = pd.read_excel(file, header=None, nrows=20)
+        
+        # Find the first non-empty row for headers
+        header_start = 0
+        for i, row in temp_df.iterrows():
+            if row.notna().any():
+                header_start = i
+                break
+        
+        # Read with dynamic header rows
+        df = pd.read_excel(
+            file,
+            header=list(range(header_start, header_start + WINCROSS_HEADER_ROWS)),
+            skiprows=range(header_start)  # Skip empty rows above headers
         )
         
-        if uploaded_file is not None:
-            if uploaded_file.size == 0:
-                st.error("❌ Uploaded file is empty")
-                return None
-            
-            # Verify file content
-            try:
-                file_contents = uploaded_file.getvalue()
-                if len(file_contents) < 100:  # Minimum reasonable file size
-                    st.error("❌ File appears to be too small or corrupted")
-                    return None
-                    
-                return uploaded_file
-            except Exception as e:
-                st.error(f"❌ File verification failed: {str(e)}")
-                return None
-        return None
+        # Clean multi-index columns
+        df.columns = [
+            ' | '.join(filter(None, map(str, col))).strip()
+            for col in df.columns.values
+        ]
+        
+        # Remove completely empty rows
+        df = df.dropna(how='all')
+        
+        # Remove completely empty columns
+        df = df.dropna(axis=1, how='all')
+        
+        # Convert percentage strings to numeric
+        for col in df.columns:
+            if df[col].dtype == object:
+                df[col] = df[col].replace(r'[%\$,]', '', regex=True)
+                try:
+                    df[col] = pd.to_numeric(df[col])
+                except:
+                    pass
+        
+        return df
+    
     except Exception as e:
-        st.error(f"❌ Upload failed: {str(e)}")
+        st.error(f"Failed to parse WinCross file: {str(e)}")
         return None
 
 # ==============================================
-# Plugin System
+# WinCross Analysis Engine
 # ==============================================
-class AnalysisPlugins:
+class WinCrossAnalysis:
+    @staticmethod
+    def split_column_name(full_name):
+        """Extract components from WinCross column names"""
+        parts = full_name.split(' | ')
+        return {
+            'question': parts[0] if len(parts) > 0 else '',
+            'response': parts[1] if len(parts) > 1 else '',
+            'statistic': parts[2] if len(parts) > 2 else ''
+        }
+
     @staticmethod
     def descriptive_stats(df):
-        stats = {
-            'basic': df.describe(include='all'),
-            'missing': df.isna().sum().to_frame('Missing Values'),
-            'dtypes': df.dtypes.to_frame('Data Type'),
-            'unique': df.nunique().to_frame('Unique Values')
-        }
+        """WinCross-optimized stats"""
+        stats = {}
+        for col in df.columns:
+            if pd.api.types.is_numeric_dtype(df[col]):
+                stats[col] = {
+                    'mean': df[col].mean(),
+                    'median': df[col].median(),
+                    'min': df[col].min(),
+                    'max': df[col].max()
+                }
         return stats
-    
+
     @staticmethod
-    def insight_generator(df):
+    def generate_insights(df):
+        """WinCross-specific insights"""
         insights = []
-        cat_cols = df.select_dtypes(include=['object', 'category']).columns
-        for col in cat_cols:
-            if df[col].nunique() < 20:
-                top_val = df[col].mode()[0]
-                freq = df[col].value_counts(normalize=True).iloc[0]
-                insights.append(f"🏆 **{col}**: Most frequent value is '{top_val}' ({freq:.1%})")
+        numeric_cols = df.select_dtypes(include=np.number).columns
         
-        num_cols = df.select_dtypes(include=['number']).columns
-        for col in num_cols:
-            if df[col].nunique() > 5:
-                insights.append(f"📊 **{col}**: Range {df[col].min():.2f}-{df[col].max():.2f} (avg={df[col].mean():.2f})")
+        for col in numeric_cols:
+            col_parts = WinCrossAnalysis.split_column_name(col)
+            if 'sig' in col_parts['statistic'].lower():
+                sig_values = df[col].dropna()
+                if len(sig_values) > 0:
+                    max_sig = sig_values.max()
+                    if max_sig < 0.05:
+                        insights.append(
+                            f"🔴 Significant finding in {col_parts['question']} "
+                            f"(p < {max_sig:.3f})"
+                        )
+        
+        # Add basic stats for numeric columns
+        for col in numeric_cols[:5]:  # Limit to top 5 for brevity
+            col_parts = WinCrossAnalysis.split_column_name(col)
+            insights.append(
+                f"📊 {col_parts['question']} ({col_parts['response']}): "
+                f"Avg = {df[col].mean():.2f}"
+            )
+        
         return insights
-    
-    @staticmethod
-    def enhanced_export(df, format='csv'):
-        if isinstance(df.columns, pd.MultiIndex):
-            export_df = df.copy()
-            export_df.columns = ['_'.join(filter(None, map(str, col))).strip() 
-                             for col in export_df.columns.values]
-        else:
-            export_df = df
-            
-        if format == 'csv':
-            return export_df.to_csv(index=False)
-        elif format == 'excel':
-            output = BytesIO()
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                export_df.to_excel(writer, index=False)
-                if st.session_state.enable_insights:
-                    insights = AnalysisPlugins.insight_generator(df)
-                    pd.DataFrame(insights, columns=["Insights"]).to_excel(
-                        writer, sheet_name='Insights', index=False
-                    )
-            return output.getvalue()
 
 # ==============================================
-# UI Components
+# Streamlit UI Setup
 # ==============================================
-st.markdown("---")
+st.set_page_config(page_title="WinCross Analyzer", layout="wide")
+st.title("📊 WinCross Crosstab Analyzer")
 
-with st.sidebar.expander("⚙️ Advanced Features"):
-    st.checkbox("Enable Auto-Insights", key="enable_insights")
-    st.checkbox("Enhanced Statistics", key="enable_enhanced_stats")
-
-# Using the safe file uploader
-uploaded_file = safe_file_upload()
+# ==============================================
+# File Upload Section
+# ==============================================
+uploaded_file = st.file_uploader(
+    "Upload WinCross Crosstab (Excel)", 
+    type=["xlsx", "xls"],
+    help="Upload standard WinCross export files"
+)
 
 if uploaded_file:
-    try:
-        df = pd.read_excel(uploaded_file, header=[0, 1, 2])
-        st.session_state["df"] = df
-        st.success("✅ File loaded successfully!")
-        
-        with st.expander("🔍 Debug: Show Column Structure"):
-            st.write("Columns:", df.columns.tolist())
-            st.write("Shape:", df.shape)
-            st.write("Data Sample:", df.head(3))
+    with st.spinner("Parsing WinCross file..."):
+        df = parse_wincross(uploaded_file)
+        if df is not None and len(df) > MIN_DATA_ROWS:
+            st.session_state.df = df
+            st.success(f"✅ Loaded {len(df)} rows with {len(df.columns)} columns")
             
-    except Exception as e:
-        st.error(f"""
-        ❌ Error reading file: {str(e)}
-        \n**Troubleshooting Tips:**
-        1. Check for merged cells in headers
-        2. Ensure consistent column structure
-        3. Try saving as .xlsx (not .xls)
-        """)
-
-if st.button("🔄 Reset Data"):
-    st.session_state["df"] = None
-    st.rerun()
+            with st.expander("🔍 Data Preview"):
+                st.dataframe(df.head(3))
+                st.write("Column examples:", df.columns.tolist()[:5])
 
 # ==============================================
-# Main Analysis Tabs
+# Analysis Tabs
 # ==============================================
 tabs = st.tabs([
-    "📘 Frequency Tables", 
-    "🔍 Group Comparisons", 
-    "🧪 Z / Chi-Square Tests", 
-    "📏 Descriptive Stats",
-    "💡 Auto Insights", 
-    "📤 Export Tools"
+    "📋 Data Overview", 
+    "📊 Basic Analysis", 
+    "🧪 Statistical Tests",
+    "💡 Insights",
+    "📤 Export"
 ])
 
-if st.session_state["df"] is not None:
-    df = st.session_state["df"]
+if st.session_state.df is not None:
+    df = st.session_state.df
     
-    # [Previous tab implementations remain exactly the same]
-    # ... (include all your existing tab code here)
+    # Tab 1: Data Overview
+    with tabs[0]:
+        st.subheader("Data Structure")
+        st.write(f"Total rows: {len(df)} | Columns: {len(df.columns)}")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.metric("Numeric Columns", 
+                     len(df.select_dtypes(include=np.number).columns))
+        with col2:
+            st.metric("Text Columns",
+                     len(df.select_dtypes(include='object').columns))
+        
+        selected_col = st.selectbox("Inspect Column", df.columns)
+        st.write(df[selected_col].describe())
+
+    # Tab 2: Basic Analysis
+    with tabs[1]:
+        st.subheader("Basic Analysis")
+        analysis_type = st.radio(
+            "Analysis Type",
+            ["Descriptive Stats", "Frequency Tables"],
+            horizontal=True
+        )
+        
+        if analysis_type == "Descriptive Stats":
+            stats = WinCrossAnalysis.descriptive_stats(df)
+            st.json(stats)
+        else:
+            selected_col = st.selectbox("Select Column", df.columns)
+            st.dataframe(df[selected_col].value_counts().head(20))
+
+    # Tab 3: Statistical Tests
+    with tabs[2]:
+        st.subheader("Statistical Testing")
+        st.info("WinCross-specific tests coming soon!")
+        # Placeholder for future statistical tests
+
+    # Tab 4: Insights
+    with tabs[3]:
+        st.subheader("Automated Insights")
+        if st.button("Generate Insights"):
+            insights = WinCrossAnalysis.generate_insights(df)
+            for insight in insights:
+                st.success(insight)
+
+    # Tab 5: Export
+    with tabs[4]:
+        st.subheader("Export Results")
+        export_format = st.selectbox("Format", ["CSV", "Excel"])
+        
+        if export_format == "CSV":
+            st.download_button(
+                "Download CSV",
+                df.to_csv(index=False),
+                "wincross_analysis.csv",
+                "text/csv"
+            )
+        else:
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df.to_excel(writer, index=False)
+            st.download_button(
+                "Download Excel",
+                output.getvalue(),
+                "wincross_analysis.xlsx",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
 
 else:
-    st.warning("⚠️ Please upload a file to begin analysis")
+    st.warning("Please upload a WinCross crosstab file to begin analysis")
 
-with st.expander("🐛 Debug: Session State"):
-    st.write(st.session_state)
+# ==============================================
+# Debug Section
+# ==============================================
+with st.expander("Debug Information"):
+    st.write("Session State:", st.session_state)
+    if st.session_state.df is not None:
+        st.write("Data Types:", st.session_state.df.dtypes.value_counts())
