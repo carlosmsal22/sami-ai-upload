@@ -1,6 +1,4 @@
-# ==============================================
-# IMPORTS MUST COME FIRST
-# ==============================================
+# =============== IMPORTS ===============
 import streamlit as st
 import pandas as pd
 import sys
@@ -8,50 +6,40 @@ from pathlib import Path
 from io import BytesIO
 import matplotlib.pyplot as plt
 
-# ==============================================
-# NOW WE CAN USE STREAMLIT COMMANDS
-# ==============================================
-st.set_page_config(page_title="🚀 Enhanced CrossTabs Analyzer", layout="wide")
+# =============== PATH FIX ===============
+# Add src directory to Python path (critical for Render deployment)
+sys.path.append(str(Path(__file__).parent.parent))
 
-# ==============================================
-# UTILS IMPORT WITH FALLBACK
-# ==============================================
+# =============== UTILS IMPORT ===============
 try:
-    from src.utils.stats_helpers import run_group_comparison, run_z_chi_tests, get_descriptive_stats
-except ImportError:
-    st.warning("Custom utils module not found - using placeholder functions")
-    
-    def run_group_comparison(df, group1, group2):
-        """Placeholder group comparison function"""
-        return pd.DataFrame({
-            "Metric": ["Mean", "Count"],
-            group1: [df[group1].mean(), len(df[group1])],
-            group2: [df[group2].mean(), len(df[group2])]
-        })
-    
-    def run_z_chi_tests(df):
-        """Placeholder statistical tests function"""
-        return pd.DataFrame({
-            "Test": ["Z-test", "Chi-square"],
-            "Value": [0.0, 0.0],
-            "p-value": [1.0, 1.0]
-        })
-    
-    def get_descriptive_stats(df):
-        """Placeholder descriptive stats function"""
-        return df.describe()
+    from utils.stats_helpers import run_group_comparison, run_z_chi_tests, get_descriptive_stats
+except ImportError as e:
+    st.error(f"""
+    ❌ Failed to import utils module: {str(e)}
+    Please verify:
+    1. The file exists at: src/utils/stats_helpers.py
+    2. The file contains all required functions
+    3. The project structure is correct
+    """)
+    st.stop()  # Halt execution if imports fail
 
-# ==============================================
-# ANALYSIS PLUGINS CLASS
-# ==============================================
+# =============== STREAMLIT CONFIG ===============
+st.set_page_config(
+    page_title="🚀 Enhanced CrossTabs Analyzer", 
+    layout="wide",
+    page_icon="📊"
+)
+st.title("🚀 Enhanced CrossTabs Analyzer")
+
+# =============== ANALYSIS PLUGINS ===============
 class AnalysisPlugins:
-    """Container for all enhanced analysis methods"""
+    """Enhanced analysis methods container"""
     
     @staticmethod
     def descriptive_stats(df):
-        """Enhanced descriptive statistics"""
+        """Enhanced descriptive statistics with metadata"""
         stats = {
-            'basic': df.describe(include='all'),
+            'basic': get_descriptive_stats(df),  # Using your imported function
             'missing': df.isna().sum().to_frame('Missing Values'),
             'dtypes': df.dtypes.to_frame('Data Type'),
             'unique': df.nunique().to_frame('Unique Values')
@@ -60,7 +48,7 @@ class AnalysisPlugins:
     
     @staticmethod
     def insight_generator(df):
-        """Automatically generate insights from data"""
+        """Auto-generated insights from data patterns"""
         insights = []
         
         # Categorical insights
@@ -81,7 +69,7 @@ class AnalysisPlugins:
     
     @staticmethod
     def enhanced_export(df, format='csv'):
-        """Improved export functionality with MultiIndex support"""
+        """Smart export with MultiIndex support"""
         if isinstance(df.columns, pd.MultiIndex):
             export_df = df.copy()
             export_df.columns = ['_'.join(filter(None, map(str, col))).strip() 
@@ -102,19 +90,76 @@ class AnalysisPlugins:
                     )
             return output.getvalue()
 
-# ==============================================
-# CORE APPLICATION
-# ==============================================
-st.title("🚀 Enhanced CrossTabs Analyzer")
-st.markdown("---")
+# =============== CORE APPLICATION ===============
+def main():
+    # Session state initialization
+    if "df" not in st.session_state:
+        st.session_state.update({
+            "df": None,
+            "enable_insights": False,
+            "enable_enhanced_stats": False
+        })
 
-# Initialize session state
-if "df" not in st.session_state:
-    st.session_state.update({
-        "df": None,
-        "enable_insights": False,
-        "enable_enhanced_stats": False
-    })
+    # Sidebar controls
+    with st.sidebar:
+        st.header("Settings")
+        with st.expander("⚙️ Advanced Features"):
+            st.session_state.enable_insights = st.checkbox(
+                "Enable Auto-Insights", 
+                value=st.session_state.enable_insights
+            )
+            st.session_state.enable_enhanced_stats = st.checkbox(
+                "Enhanced Statistics", 
+                value=st.session_state.enable_enhanced_stats
+            )
 
-# [Rest of your application code remains exactly the same...]
-# [Include all the remaining tabs and functionality from your original code]
+        # Debug info
+        with st.expander("🐛 Debug Info"):
+            st.write("Python path:", sys.path)
+            st.write("Current directory:", Path(__file__).parent)
+            st.write("Utils path:", str(Path(__file__).parent.parent / "utils" / "stats_helpers.py"))
+
+    # File uploader
+    uploaded_file = st.file_uploader(
+        "Upload cross-tabulated data (Excel)", 
+        type=["xlsx", "xls"]
+    )
+
+    if uploaded_file:
+        try:
+            df = pd.read_excel(uploaded_file, header=[0, 1, 2])
+            st.session_state["df"] = df
+            st.success("✅ File loaded successfully!")
+            
+            with st.expander("🔍 Data Preview"):
+                st.write("Columns:", df.columns.tolist())
+                st.write("Shape:", df.shape)
+                st.dataframe(df.head(3))
+                
+        except Exception as e:
+            st.error(f"❌ Error reading file: {str(e)}")
+            st.session_state["df"] = None
+
+    if st.button("🔄 Reset Data"):
+        st.session_state["df"] = None
+        st.rerun()
+
+    # Main tabs
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+        "📊 Frequency Tables", 
+        "🔍 Group Comparisons", 
+        "🧪 Statistical Tests", 
+        "📈 Descriptive Stats",
+        "💡 Auto Insights",
+        "📤 Export Data"
+    ])
+
+    if st.session_state["df"] is not None:
+        df = st.session_state["df"]
+        
+        # [Rest of your tab implementations...]
+        # [Include all your existing tab code here]
+        # [Make sure to use the imported functions]
+        
+if __name__ == "__main__":
+    main()
