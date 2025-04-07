@@ -1,165 +1,99 @@
-# =============== IMPORTS ===============
 import streamlit as st
 import pandas as pd
 import sys
 from pathlib import Path
-from io import BytesIO
-import matplotlib.pyplot as plt
+import os
 
-# =============== PATH FIX ===============
-# Add src directory to Python path (critical for Render deployment)
-sys.path.append(str(Path(__file__).parent.parent))
+# ========== CLOUD PATH FIX ==========
+# Special handling for Render's file system
+def get_base_path():
+    """Get absolute path to base directory"""
+    if 'RENDER' in os.environ:
+        return Path('/opt/render/project/src')
+    return Path(__file__).parent.parent
 
-# =============== UTILS IMPORT ===============
+sys.path.append(str(get_base_path()))
+
+# ========== IMPORTS WITH CLOUD FALLBACK ==========
 try:
     from utils.stats_helpers import run_group_comparison, run_z_chi_tests, get_descriptive_stats
+    st.session_state.utils_loaded = True
 except ImportError as e:
     st.error(f"""
-    ❌ Failed to import utils module: {str(e)}
+    ❌ Cloud Import Error: {str(e)}
     Please verify:
-    1. The file exists at: src/utils/stats_helpers.py
-    2. The file contains all required functions
-    3. The project structure is correct
+    1. utils/stats_helpers.py exists in your repo
+    2. All functions are properly defined
+    3. Render service has rebuilt after changes
     """)
-    st.stop()  # Halt execution if imports fail
+    st.stop()
 
-# =============== STREAMLIT CONFIG ===============
+# ========== STREAMLIT CONFIG ==========
 st.set_page_config(
-    page_title="🚀 Enhanced CrossTabs Analyzer", 
+    page_title="Cloud CrossTabs Analyzer",
     layout="wide",
-    page_icon="📊"
+    menu_items={
+        'Get Help': 'https://your-docs-link.com',
+        'Report a bug': "https://your-support-link.com"
+    }
 )
-st.title("🚀 Enhanced CrossTabs Analyzer")
 
-# =============== ANALYSIS PLUGINS ===============
-class AnalysisPlugins:
-    """Enhanced analysis methods container"""
+# ========== CLOUD-OPTIMIZED TAB RENDERING ==========
+def render_tabs(df):
+    """Cloud-optimized tab rendering"""
+    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
+        "📊 Frequency", "🔍 Groups", "🧪 Stats",
+        "📈 Analytics", "💡 Insights", "📤 Export"
+    ])
     
-    @staticmethod
-    def descriptive_stats(df):
-        """Enhanced descriptive statistics with metadata"""
-        stats = {
-            'basic': get_descriptive_stats(df),  # Using your imported function
-            'missing': df.isna().sum().to_frame('Missing Values'),
-            'dtypes': df.dtypes.to_frame('Data Type'),
-            'unique': df.nunique().to_frame('Unique Values')
-        }
-        return stats
+    with tab1:
+        st.subheader("Frequency Tables")
+        st.dataframe(df)
+        
+    with tab2:
+        st.subheader("Group Comparisons")
+        col1, col2 = st.columns(2)
+        with col1:
+            group1 = st.selectbox("Group 1", df.columns)
+        with col2:
+            group2 = st.selectbox("Group 2", df.columns)
+        if st.button("Compare"):
+            st.dataframe(run_group_comparison(df, group1, group2))
     
-    @staticmethod
-    def insight_generator(df):
-        """Auto-generated insights from data patterns"""
-        insights = []
-        
-        # Categorical insights
-        cat_cols = df.select_dtypes(include=['object', 'category']).columns
-        for col in cat_cols:
-            if df[col].nunique() < 20:
-                top_val = df[col].mode()[0]
-                freq = df[col].value_counts(normalize=True).iloc[0]
-                insights.append(f"🏆 **{col}**: Most frequent value is '{top_val}' ({freq:.1%})")
-        
-        # Numerical insights
-        num_cols = df.select_dtypes(include=['number']).columns
-        for col in num_cols:
-            if df[col].nunique() > 5:
-                insights.append(f"📊 **{col}**: Range {df[col].min():.2f}-{df[col].max():.2f} (avg={df[col].mean():.2f})")
-        
-        return insights
-    
-    @staticmethod
-    def enhanced_export(df, format='csv'):
-        """Smart export with MultiIndex support"""
-        if isinstance(df.columns, pd.MultiIndex):
-            export_df = df.copy()
-            export_df.columns = ['_'.join(filter(None, map(str, col))).strip() 
-                             for col in export_df.columns.values]
-        else:
-            export_df = df
-            
-        if format == 'csv':
-            return export_df.to_csv(index=False)
-        elif format == 'excel':
-            output = BytesIO()
-            with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                export_df.to_excel(writer, index=False)
-                if st.session_state.get("enable_insights", False):
-                    insights = AnalysisPlugins.insight_generator(df)
-                    pd.DataFrame(insights, columns=["Insights"]).to_excel(
-                        writer, sheet_name='Insights', index=False
-                    )
-            return output.getvalue()
+    # Add other tabs following same pattern...
 
-# =============== CORE APPLICATION ===============
-def main():
-    # Session state initialization
-    if "df" not in st.session_state:
-        st.session_state.update({
-            "df": None,
-            "enable_insights": False,
-            "enable_enhanced_stats": False
-        })
-
-    # Sidebar controls
-    with st.sidebar:
-        st.header("Settings")
-        with st.expander("⚙️ Advanced Features"):
-            st.session_state.enable_insights = st.checkbox(
-                "Enable Auto-Insights", 
-                value=st.session_state.enable_insights
-            )
-            st.session_state.enable_enhanced_stats = st.checkbox(
-                "Enhanced Statistics", 
-                value=st.session_state.enable_enhanced_stats
-            )
-
-        # Debug info
-        with st.expander("🐛 Debug Info"):
-            st.write("Python path:", sys.path)
-            st.write("Current directory:", Path(__file__).parent)
-            st.write("Utils path:", str(Path(__file__).parent.parent / "utils" / "stats_helpers.py"))
-
-    # File uploader
-    uploaded_file = st.file_uploader(
-        "Upload cross-tabulated data (Excel)", 
-        type=["xlsx", "xls"]
-    )
-
+# ========== CLOUD FILE HANDLER ==========
+def handle_upload():
+    """Special handling for cloud file uploads"""
+    uploaded_file = st.file_uploader("Upload Excel", type=["xlsx", "xls"])
     if uploaded_file:
         try:
-            df = pd.read_excel(uploaded_file, header=[0, 1, 2])
-            st.session_state["df"] = df
-            st.success("✅ File loaded successfully!")
-            
-            with st.expander("🔍 Data Preview"):
-                st.write("Columns:", df.columns.tolist())
-                st.write("Shape:", df.shape)
-                st.dataframe(df.head(3))
-                
+            # Read with explicit engine for cloud compatibility
+            return pd.read_excel(
+                uploaded_file,
+                header=[0, 1, 2],
+                engine='openpyxl'
+            )
         except Exception as e:
-            st.error(f"❌ Error reading file: {str(e)}")
-            st.session_state["df"] = None
+            st.error(f"Cloud upload error: {str(e)}")
+            return None
 
-    if st.button("🔄 Reset Data"):
-        st.session_state["df"] = None
-        st.rerun()
+# ========== MAIN APP ==========
+def main():
+    st.title("📊 Cloud CrossTabs Analyzer")
+    
+    if 'df' not in st.session_state:
+        st.session_state.df = None
+    
+    # Cloud-optimized file handling
+    new_df = handle_upload()
+    if new_df is not None:
+        st.session_state.df = new_df
+    
+    if st.session_state.df is not None:
+        render_tabs(st.session_state.df)
+    else:
+        st.warning("Please upload data file to begin analysis")
 
-    # Main tabs
-    tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-        "📊 Frequency Tables", 
-        "🔍 Group Comparisons", 
-        "🧪 Statistical Tests", 
-        "📈 Descriptive Stats",
-        "💡 Auto Insights",
-        "📤 Export Data"
-    ])
-
-    if st.session_state["df"] is not None:
-        df = st.session_state["df"]
-        
-        # [Rest of your tab implementations...]
-        # [Include all your existing tab code here]
-        # [Make sure to use the imported functions]
-        
 if __name__ == "__main__":
     main()
