@@ -1,31 +1,34 @@
-
 import pandas as pd
-import numpy as np
-from scipy.stats import chi2_contingency, ttest_ind
+from scipy import stats
 
-def run_group_comparison(df, col1, col2):
-    try:
-        return df[[col1, col2]]
-    except Exception as e:
-        return pd.DataFrame({"Error": [str(e)]})
+def run_group_comparison(df, group1, group2):
+    """Compare two groups statistically"""
+    result = pd.DataFrame({
+        'Metric': ['Mean', 'Std Dev', 'Count'],
+        group1: [df[group1].mean(), df[group1].std(), len(df[group1])],
+        group2: [df[group2].mean(), df[group2].std(), len(df[group2])],
+        'Difference': [
+            df[group1].mean() - df[group2].mean(),
+            df[group1].std() - df[group2].std(),
+            len(df[group1]) - len(df[group2])
+        ]
+    })
+    return result
 
 def run_z_chi_tests(df):
-    try:
-        table = df.select_dtypes(include=[np.number])
-        chi2, p, dof, expected = chi2_contingency(table.values)
-        return pd.DataFrame({
-            "Chi2 Statistic": [chi2],
-            "p-value": [p],
-            "Degrees of Freedom": [dof]
-        })
-    except Exception as e:
-        return pd.DataFrame({"Error": [str(e)]})
+    """Run statistical tests on dataframe"""
+    results = []
+    for col in df.select_dtypes(include=['number']).columns:
+        if df[col].nunique() > 1:  # Only run if there's variation
+            z_score = stats.zscore(df[col])
+            results.append({
+                'Column': col,
+                'Test': 'Z-score',
+                'Mean': z_score.mean(),
+                'Std Dev': z_score.std()
+            })
+    return pd.DataFrame(results)
 
 def get_descriptive_stats(df):
-    try:
-        numeric = df.select_dtypes(include=[np.number])
-        desc = numeric.describe().T
-        desc["median"] = numeric.median()
-        return desc
-    except Exception as e:
-        return pd.DataFrame({"Error": [str(e)]})
+    """Get enhanced descriptive statistics"""
+    return df.describe(include='all')
