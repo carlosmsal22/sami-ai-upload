@@ -17,21 +17,23 @@ def get_base_path():
 
 sys.path.append(str(get_base_path()))
 
-# =============== SAFE DATA PROCESSING ===============
+# =============== DATA PROCESSING HELPERS ===============
+def convert_to_numeric(df):
+    """Automatically convert convertible columns to numeric"""
+    for col in df.columns:
+        try:
+            df[col] = pd.to_numeric(df[col], errors='ignore')
+        except:
+            pass
+    return df
+
 def safe_mode(series):
     """Handle empty/missing data when calculating mode"""
     try:
         mode = series.mode()
         return mode[0] if not mode.empty else "N/A"
-    except Exception:
+    except:
         return "N/A"
-
-def safe_describe(df):
-    """Robust descriptive stats"""
-    try:
-        return df.describe(include='all')
-    except Exception:
-        return pd.DataFrame({"Error": ["Could not compute stats"]})
 
 # =============== STREAMLIT APP ===============
 st.set_page_config(
@@ -43,7 +45,7 @@ st.set_page_config(
 def main():
     st.title("📊 CrossTab Analyzer")
     
-    # File upload
+    # File upload with automatic type conversion
     uploaded_file = st.file_uploader("Upload Excel/CSV", type=["xlsx", "csv"])
     if uploaded_file:
         with st.spinner("Processing file..."):
@@ -59,6 +61,9 @@ def main():
                     # Flatten multi-index columns
                     df.columns = ['_'.join(filter(None, map(str, col))).strip() 
                                  for col in df.columns.values]
+                
+                # Convert compatible columns to numeric
+                df = convert_to_numeric(df)
                 st.session_state.df = df
                 st.success("✅ File loaded successfully!")
             except Exception as e:
@@ -81,13 +86,13 @@ def main():
     # =============== STATS TAB ===============
     with tab1:
         st.subheader("Statistical Analysis")
-        stats = safe_describe(df)
+        stats = df.describe(include='all')
         st.dataframe(stats)
         
-        # Numeric columns only for visualization
+        # Show distribution for numeric columns
         num_cols = df.select_dtypes(include=np.number).columns.tolist()
         if num_cols:
-            col = st.selectbox("Select column for distribution", num_cols)
+            col = st.selectbox("Select column for distribution", num_cols, key='dist_col')
             fig, ax = plt.subplots()
             df[col].plot(kind='hist', ax=ax)
             st.pyplot(fig)
@@ -102,9 +107,9 @@ def main():
         if len(num_cols) >= 2:
             col1, col2 = st.columns(2)
             with col1:
-                x_col = st.selectbox("X-axis column", num_cols)
+                x_col = st.selectbox("X-axis column", num_cols, key='x_axis')
             with col2:
-                y_col = st.selectbox("Y-axis column", num_cols)
+                y_col = st.selectbox("Y-axis column", num_cols, key='y_axis')
             
             try:
                 chart = alt.Chart(df).mark_circle().encode(
@@ -116,7 +121,18 @@ def main():
             except Exception as e:
                 st.error(f"Chart error: {str(e)}")
         else:
-            st.warning("Need at least 2 numeric columns for analytics")
+            st.warning("""
+            Need at least 2 numeric columns for analytics. 
+            Try converting text columns to numbers in your source file.
+            """)
+            
+            # Show convertible columns
+            st.info("Potential columns to convert to numeric:")
+            for col in df.columns:
+                if pd.api.types.is_string_dtype(df[col]):
+                    sample = df[col].head(1).values[0]
+                    if str(sample).replace('.','',1).isdigit():
+                        st.write(f"- {col} (sample value: {sample})")
     
     # =============== INSIGHTS TAB ===============
     with tab3:
@@ -139,8 +155,8 @@ def main():
                         f"🏷 **{col}**: "
                         f"Most common = '{top_val}' ({freq:.1%})"
                     )
-            except Exception:
-                insights.append(f"❌ Could not analyze column: {col}")
+            except Exception as e:
+                insights.append(f"❌ Could not analyze column: {col} ({str(e)})")
         
         for insight in insights[:15]:  # Limit to 15 insights
             st.info(insight)
