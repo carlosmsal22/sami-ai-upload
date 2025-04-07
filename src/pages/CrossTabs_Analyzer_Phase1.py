@@ -17,25 +17,21 @@ def get_base_path():
 
 sys.path.append(str(get_base_path()))
 
-# =============== DATA LOADER ===============
-def load_data(uploaded_file):
+# =============== SAFE DATA PROCESSING ===============
+def safe_mode(series):
+    """Handle empty/missing data when calculating mode"""
     try:
-        if uploaded_file.name.endswith('.csv'):
-            df = pd.read_csv(uploaded_file)
-        else:
-            df = pd.read_excel(
-                uploaded_file,
-                engine='openpyxl',
-                header=[0, 1, 2],
-                dtype=str  # Prevent Arrow errors
-            )
-            # Clean multi-index columns
-            df.columns = ['_'.join(filter(None, map(str, col))).strip() 
-                         for col in df.columns.values]
-        return df
-    except Exception as e:
-        st.error(f"🚨 Data loading error: {str(e)}")
-        return None
+        mode = series.mode()
+        return mode[0] if not mode.empty else "N/A"
+    except Exception:
+        return "N/A"
+
+def safe_describe(df):
+    """Robust descriptive stats"""
+    try:
+        return df.describe(include='all')
+    except Exception:
+        return pd.DataFrame({"Error": ["Could not compute stats"]})
 
 # =============== STREAMLIT APP ===============
 st.set_page_config(
@@ -51,7 +47,23 @@ def main():
     uploaded_file = st.file_uploader("Upload Excel/CSV", type=["xlsx", "csv"])
     if uploaded_file:
         with st.spinner("Processing file..."):
-            st.session_state.df = load_data(uploaded_file)
+            try:
+                if uploaded_file.name.endswith('.csv'):
+                    df = pd.read_csv(uploaded_file)
+                else:
+                    df = pd.read_excel(
+                        uploaded_file,
+                        engine='openpyxl',
+                        header=[0, 1, 2]
+                    )
+                    # Flatten multi-index columns
+                    df.columns = ['_'.join(filter(None, map(str, col))).strip() 
+                                 for col in df.columns.values]
+                st.session_state.df = df
+                st.success("✅ File loaded successfully!")
+            except Exception as e:
+                st.error(f"🚨 Error loading file: {str(e)}")
+                st.session_state.df = None
     
     if 'df' not in st.session_state or st.session_state.df is None:
         return st.warning("Please upload a file to begin")
@@ -69,36 +81,40 @@ def main():
     # =============== STATS TAB ===============
     with tab1:
         st.subheader("Statistical Analysis")
-        if st.button("Run Descriptive Stats"):
-            try:
-                stats = df.describe(include='all')
-                st.dataframe(stats)
-                
-                # Add distribution plot
-                num_cols = df.select_dtypes(include=np.number).columns
-                if len(num_cols) > 0:
-                    col = st.selectbox("Select numeric column", num_cols)
-                    fig, ax = plt.subplots()
-                    df[col].plot(kind='hist', ax=ax)
-                    st.pyplot(fig)
-            except Exception as e:
-                st.error(f"Stats error: {str(e)}")
+        stats = safe_describe(df)
+        st.dataframe(stats)
+        
+        # Numeric columns only for visualization
+        num_cols = df.select_dtypes(include=np.number).columns.tolist()
+        if num_cols:
+            col = st.selectbox("Select column for distribution", num_cols)
+            fig, ax = plt.subplots()
+            df[col].plot(kind='hist', ax=ax)
+            st.pyplot(fig)
+        else:
+            st.warning("No numeric columns found for visualization")
     
     # =============== ANALYTICS TAB ===============
     with tab2:
         st.subheader("Data Analytics")
-        num_cols = df.select_dtypes(include=np.number).columns
+        num_cols = df.select_dtypes(include=np.number).columns.tolist()
         
         if len(num_cols) >= 2:
-            x_col = st.selectbox("X-axis column", num_cols)
-            y_col = st.selectbox("Y-axis column", num_cols)
+            col1, col2 = st.columns(2)
+            with col1:
+                x_col = st.selectbox("X-axis column", num_cols)
+            with col2:
+                y_col = st.selectbox("Y-axis column", num_cols)
             
-            chart = alt.Chart(df).mark_circle().encode(
-                x=x_col,
-                y=y_col,
-                tooltip=list(df.columns[:3])
-            )
-            st.altair_chart(chart, use_container_width=True)
+            try:
+                chart = alt.Chart(df).mark_circle().encode(
+                    x=x_col,
+                    y=y_col,
+                    tooltip=list(df.columns[:3])
+                )
+                st.altair_chart(chart, use_container_width=True)
+            except Exception as e:
+                st.error(f"Chart error: {str(e)}")
         else:
             st.warning("Need at least 2 numeric columns for analytics")
     
@@ -106,18 +122,27 @@ def main():
     with tab3:
         st.subheader("Data Insights")
         
-        # Auto insights
         insights = []
         for col in df.columns:
-            if pd.api.types.is_numeric_dtype(df[col]):
-                stats = df[col].describe()
-                insights.append(f"📌 **{col}**: Avg={stats['mean']:.2f}, Range={stats['min']:.2f}-{stats['max']:.2f}")
-            else:
-                top_val = df[col].mode()[0]
-                freq = df[col].value_counts(normalize=True).iloc[0]
-                insights.append(f"🏷 **{col}**: Most common = '{top_val}' ({freq:.1%})")
+            try:
+                if pd.api.types.is_numeric_dtype(df[col]):
+                    stats = df[col].describe()
+                    insights.append(
+                        f"📌 **{col}**: "
+                        f"Avg={stats.get('mean', 'N/A'):.2f}, "
+                        f"Range={stats.get('min', 'N/A'):.2f}-{stats.get('max', 'N/A'):.2f}"
+                    )
+                else:
+                    top_val = safe_mode(df[col])
+                    freq = df[col].value_counts(normalize=True).iloc[0] if not df[col].empty else 0
+                    insights.append(
+                        f"🏷 **{col}**: "
+                        f"Most common = '{top_val}' ({freq:.1%})"
+                    )
+            except Exception:
+                insights.append(f"❌ Could not analyze column: {col}")
         
-        for insight in insights[:10]:  # Limit to 10 insights
+        for insight in insights[:15]:  # Limit to 15 insights
             st.info(insight)
     
     # =============== EXPORT TAB ===============
