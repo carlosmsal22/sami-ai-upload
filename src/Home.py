@@ -173,7 +173,6 @@ nav a:hover {
     </html>
     """
     st.components.v1.html(homepage_html, height=800) # Adjust height if needed
-
 if 'start_app' in st.query_params:
     st.title("🤖 Welcome to SAMI AI")
     st.markdown("""
