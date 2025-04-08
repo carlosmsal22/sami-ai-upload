@@ -7,44 +7,49 @@ body {
     margin: 0;
     background: linear-gradient(135deg, #37474F, #263238);
     color: #ECEFF1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh; /* Add this line */
-    padding: 20px;
-    box-sizing: border-box;
+    display: flex; /* Enable flexbox for the body */
+    min-height: 100vh; /* Ensure body takes at least full height */
 }
 
 .container {
-    display: flex;
-    max-width: 1200px;
+    display: flex; /* Keep flex for image and content */
     width: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    border-radius: 10px;
+    height: 100vh; /* Make container take full viewport height */
+    background-color: transparent;
+    border-radius: 0;
     overflow: hidden;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+    box-shadow: none;
 }
 
 .image-section {
-    flex: 0 0 50%;
+    flex: 0 0 60%; /* Image takes 60% width */
     display: flex;
     justify-content: center;
     align-items: center;
-    padding: 40px;
+    padding: 20px;
+}
+
+.image-section > div { /* Target a potential wrapper div */
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 .image-section img {
-    max-width: 80%;
-    height: auto;
+    max-width: 95%;
+    max-height: 95%;
+    object-fit: contain;
 }
 
 .content-section {
-    flex: 0 0 50%;
-    padding: 60px;
+    flex: 0 0 40%; /* Content takes 40% width */
     display: flex;
     flex-direction: column;
-    justify-content: center;
+    justify-content: center; /* Center content vertically */
     align-items: flex-start;
+    height: 100%; /* Fill container height */
+    padding: 40px;
 }
 
 h1 {
@@ -80,7 +85,6 @@ h1 {
     background-color: #0288D1;
 }
 
-/* Header (Logo and Navigation) */
 header {
     position: absolute;
     top: 20px;
@@ -108,13 +112,18 @@ nav a:hover {
     color: #81D4FA;
 }
 
-/* Responsive Design (for smaller screens) */
 @media (max-width: 900px) {
+    body {
+        flex-direction: column;
+        align-items: center;
+    }
     .container {
         flex-direction: column;
+        height: auto;
     }
     .image-section, .content-section {
-        flex: 0 0 100%;
+        flex: 0 0 auto;
+        width: 80%;
         padding: 30px;
         text-align: center;
         align-items: center;
@@ -123,12 +132,15 @@ nav a:hover {
         align-items: center;
     }
     .image-section img {
-        max-width: 50%;
+        max-width: 70%;
     }
     header {
         flex-direction: column;
         align-items: center;
         text-align: center;
+        position: static;
+        padding: 10px;
+        width: 100%;
     }
     nav {
         margin-top: 10px;
