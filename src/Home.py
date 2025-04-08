@@ -1,8 +1,12 @@
 import streamlit as st
+from streamlit_javascript import st_javascript  # For proper redirection
 
-# Configuration - use the raw GitHub URL for your image
-IMAGE_URL = "https://raw.githubusercontent.com/yourusername/sami-ai-upload/main/images/robot-hand.png"
-FALLBACK_IMAGE = "https://via.placeholder.com/600x400/37474F/ECEFF1?text=SAMI+AI"
+# Configuration
+GITHUB_USER = "yourusername"  # Replace with your GitHub username
+REPO_NAME = "sami-ai-upload"  # Your repository name
+IMAGE_PATH = "images/robot-hand.png"  # Corrected image path
+IMAGE_URL = f"https://raw.githubusercontent.com/{GITHUB_USER}/{REPO_NAME}/main/{IMAGE_PATH}"
+MAIN_APP_URL = "/"  # Or your specific app route
 
 def show_homepage():
     # Page setup
@@ -16,18 +20,12 @@ def show_homepage():
     # Custom CSS
     st.markdown("""
     <style>
-        :root {
-            --primary: #03A9F4;
-            --dark-bg: linear-gradient(135deg, #37474F, #263238);
-            --text-light: #ECEFF1;
-            --text-muted: #B0BEC5;
-        }
         .main {
-            background: var(--dark-bg);
-            color: var(--text-light);
+            background: linear-gradient(135deg, #37474F, #263238);
+            color: #ECEFF1;
         }
         .stButton>button {
-            background-color: var(--primary);
+            background-color: #03A9F4;
             color: white;
             border: none;
             padding: 12px 24px;
@@ -50,10 +48,6 @@ def show_homepage():
             .responsive-columns {
                 flex-direction: column-reverse;
             }
-            .image-container {
-                padding: 0;
-                margin-bottom: 20px;
-            }
         }
     </style>
     """, unsafe_allow_html=True)
@@ -70,9 +64,9 @@ def show_homepage():
     """, unsafe_allow_html=True)
 
     # Main content
-    main_col1, main_col2 = st.columns([0.6, 0.4], gap="large")
+    col1, col2 = st.columns([0.6, 0.4], gap="large")
     
-    with main_col1:
+    with col1:
         try:
             st.markdown(f"""
             <div class="image-container">
@@ -80,13 +74,13 @@ def show_homepage():
                      style="max-width:100%; max-height:70vh; object-fit: contain; border-radius: 8px;"/>
             </div>
             """, unsafe_allow_html=True)
-        except Exception as e:
-            st.error(f"Image loading failed: {str(e)}")
-            st.image(FALLBACK_IMAGE, use_container_width=True)
+        except:
+            st.error("Image failed to load. Please check:")
+            st.code(f"Image URL: {IMAGE_URL}")
     
-    with main_col2:
+    with col2:
         st.markdown("<h1 style='color: #81D4FA; margin-top: 0;'>SAMI AI</h1>", unsafe_allow_html=True)
-        st.markdown("<p style='color: var(--text-muted); font-size: 1.5em;'>EMPOWERING FUTURE TRENDS</p>", unsafe_allow_html=True)
+        st.markdown("<p style='color: #B0BEC5; font-size: 1.5em;'>EMPOWERING FUTURE TRENDS</p>", unsafe_allow_html=True)
         st.markdown("""
         <p style='line-height: 1.6; margin-bottom: 30px;'>
         Get AI-driven insights on emerging trends in markets, technology, 
@@ -96,7 +90,9 @@ def show_homepage():
         """, unsafe_allow_html=True)
         
         if st.button("Get Started", type="primary", use_container_width=True):
-            st.query_params["start_app"] = True
+            # Proper page navigation
+            js = f"window.location.href = '{MAIN_APP_URL}'"
+            st_javascript(js)
 
 # App routing
 if 'start_app' in st.query_params:
@@ -105,6 +101,5 @@ if 'start_app' in st.query_params:
     Welcome to your all-in-one AI-powered research assistant.
     Use the sidebar to explore and analyze your data using advanced modules:
     """)
-    st.success("Image successfully loaded from: " + IMAGE_URL)
 else:
     show_homepage()
