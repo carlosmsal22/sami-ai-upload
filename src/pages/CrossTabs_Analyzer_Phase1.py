@@ -5,16 +5,30 @@ import numpy as np
 from io import BytesIO
 import matplotlib.pyplot as plt
 import altair as alt
+import re
 
 # =============== DATA CLEANING ===============
+def clean_column_name(name):
+    """Convert column names to Altair-safe format"""
+    if not isinstance(name, str):
+        name = str(name)
+    # Remove special characters and spaces
+    name = re.sub(r'[^a-zA-Z0-9_]', '_', name)
+    # Remove leading/trailing underscores
+    name = name.strip('_')
+    # Ensure it starts with a letter
+    if name and not name[0].isalpha():
+        name = 'col_' + name
+    return name
+
 def clean_data(df):
     """Handle all data cleaning and type conversion"""
     # Clean column names
     if isinstance(df.columns, pd.MultiIndex):
-        df.columns = ['_'.join(filter(None, map(str, col))).strip() 
+        df.columns = [clean_column_name('_'.join(filter(None, map(str, col)))) 
                      for col in df.columns.values]
     else:
-        df.columns = [str(col).strip() for col in df.columns]
+        df.columns = [clean_column_name(col) for col in df.columns]
     
     # Replace empty strings with NaN
     df = df.replace(r'^\s*$', np.nan, regex=True)
@@ -77,6 +91,7 @@ def main():
                 
                 # Debug view
                 with st.expander("View cleaned data"):
+                    st.write("Cleaned column names:", df.columns.tolist())
                     st.write(df.head(3))
                     st.write("Column types:", df.dtypes)
                     
@@ -123,10 +138,14 @@ def main():
             with col2:
                 y_col = st.selectbox("Y-axis (Question)", num_cols)
             
+            # Create Altair-safe column names for encoding
+            safe_x = alt.X(x_col, type='quantitative')
+            safe_y = alt.Y(y_col, type='quantitative')
+            
             # Interactive scatter plot
             chart = alt.Chart(df).mark_circle(size=60).encode(
-                x=x_col,
-                y=y_col,
+                x=safe_x,
+                y=safe_y,
                 tooltip=list(df.columns)
             ).interactive()
             st.altair_chart(chart, use_container_width=True)
