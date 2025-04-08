@@ -7,44 +7,43 @@ body {
     margin: 0;
     background: linear-gradient(135deg, #37474F, #263238);
     color: #ECEFF1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 100vh; /* Add this line */
-    padding: 20px;
+    min-height: 100vh;
+    padding: 0;
     box-sizing: border-box;
+    display: flex; /* Enable flexbox for the body */
 }
 
 .container {
-    display: flex;
-    max-width: 1200px;
-    width: 100%;
-    background-color: rgba(0, 0, 0, 0.5);
-    border-radius: 10px;
+    display: flex; /* Keep flex for image and content sections */
+    width: 100%; /* Make container take full width */
+    height: 100vh; /* Make container take full height */
+    background-color: transparent; /* Make container background transparent */
+    border-radius: 0;
     overflow: hidden;
-    box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+    box-shadow: none;
 }
 
 .image-section {
-    flex: 0 0 50%;
+    flex: 0 0 60%; /* Image takes up 60% of the width */
     display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 40px;
+    justify-content: center; /* Center image horizontally */
+    align-items: center; /* Center image vertically */
+    padding: 40px; /* Adjust padding as needed */
 }
 
 .image-section img {
-    max-width: 80%;
-    height: auto;
+    max-width: 90%; /* Adjust image size */
+    max-height: 90%;
+    object-fit: contain; /* Ensure the image fits within the section */
 }
 
 .content-section {
-    flex: 0 0 50%;
-    padding: 60px;
+    flex: 0 0 40%; /* Content takes up 40% of the width */
+    padding: 60px; /* Adjust padding for text area */
     display: flex;
     flex-direction: column;
-    justify-content: center;
-    align-items: flex-start;
+    justify-content: center; /* Center text vertically */
+    align-items: flex-start; /* Align text to the left */
 }
 
 h1 {
@@ -80,7 +79,7 @@ h1 {
     background-color: #0288D1;
 }
 
-/* Header (Logo and Navigation) */
+/* Header (Logo and Navigation) - Position it absolutely */
 header {
     position: absolute;
     top: 20px;
@@ -108,13 +107,19 @@ nav a:hover {
     color: #81D4FA;
 }
 
-/* Responsive Design (for smaller screens) */
+/* Responsive Design (adjust as needed) */
 @media (max-width: 900px) {
+    body {
+        flex-direction: column; /* Stack image and content on smaller screens */
+        align-items: center; /* Center items horizontally */
+    }
     .container {
         flex-direction: column;
+        height: auto; /* Adjust height for stacked layout */
     }
     .image-section, .content-section {
-        flex: 0 0 100%;
+        flex: 0 0 auto; /* Let content take auto height */
+        width: 80%; /* Adjust width for smaller screens */
         padding: 30px;
         text-align: center;
         align-items: center;
@@ -123,12 +128,15 @@ nav a:hover {
         align-items: center;
     }
     .image-section img {
-        max-width: 50%;
+        max-width: 70%;
     }
     header {
         flex-direction: column;
         align-items: center;
         text-align: center;
+        position: static; /* Flow with the content on smaller screens */
+        padding: 10px;
+        width: 100%;
     }
     nav {
         margin-top: 10px;
@@ -137,7 +145,6 @@ nav a:hover {
         margin: 0 10px;
     }
 }
-"""
     homepage_html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
