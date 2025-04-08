@@ -1,128 +1,153 @@
-import streamlit as st
-
-st.set_page_config(layout="wide")
-
 def show_homepage():
-    homepage_html = """
+    base64_image = "[YOUR_BASE64_ENCODED_ROBOT_HAND_IMAGE_STRING_HERE]"
+    inlined_css = """
+    body {
+        font-family: 'Roboto', sans-serif; /* Use a common, clean font */
+        margin: 0;
+        background: linear-gradient(135deg, #37474F, #263238); /* Dark blue-grey gradient background */
+        color: #ECEFF1; /* Light grey/white text color */
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh; /* Make the background cover the entire viewport */
+        padding: 20px;
+        box-sizing: border-box; /* Include padding and border in element's total width and height */
+    }
+
+    .container {
+        display: flex;
+        max-width: 1200px; /* Limit the maximum width of the content area */
+        width: 100%; /* Make the container take full width up to the max-width */
+        background-color: rgba(0, 0, 0, 0.5); /* Semi-transparent dark background for content */
+        border-radius: 10px; /* Slightly rounded corners */
+        overflow: hidden; /* Prevent content from overflowing rounded corners */
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.3); /* Subtle shadow for depth */
+    }
+
+    .image-section {
+        flex: 0 0 50%; /* Takes up 50% of the container width */
+        display: flex;
+        justify-content: center; /* Center the image horizontally */
+        align-items: center; /* Center the image vertically */
+        padding: 40px;
+    }
+
+    .image-section img {
+        max-width: 80%; /* Ensure the image doesn't get too large */
+        height: auto; /* Maintain image aspect ratio */
+    }
+
+    .content-section {
+        flex: 0 0 50%; /* Takes up 50% of the container width */
+        padding: 60px;
+        display: flex;
+        flex-direction: column; /* Stack content vertically */
+        justify-content: center; /* Center content vertically */
+        align-items: flex-start; /* Align text to the left */
+    }
+
+    h1 {
+        font-size: 3em; /* Large heading */
+        margin-bottom: 10px;
+        color: #81D4FA; /* A light blue accent color for the title */
+    }
+
+    .subtitle {
+        font-size: 1.5em; /* Slightly smaller subtitle */
+        color: #B0BEC5; /* A lighter grey for the subtitle */
+        margin-bottom: 20px;
+    }
+
+    .description {
+        line-height: 1.6; /* Improve readability of the description */
+        margin-bottom: 30px;
+    }
+
+    .get-started-button {
+        background-color: #03A9F4; /* A brighter blue for the button */
+        color: white;
+        border: none;
+        padding: 15px 30px; /* Comfortable padding inside the button */
+        border-radius: 5px; /* Slightly rounded button corners */
+        font-size: 1.2em;
+        cursor: pointer; /* Change cursor to indicate it's clickable */
+        transition: background-color 0.3s ease; /* Smooth transition for hover effect */
+        text-decoration: none; /* Remove underline from the link */
+    }
+
+    .get-started-button:hover {
+        background-color: #0288D1; /* Darker shade of blue on hover */
+    }
+
+    /* Header (Logo and Navigation) */
+    header {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        display: flex;
+        justify-content: space-between; /* Space out logo and navigation */
+        align-items: center;
+        width: calc(100% - 40px); /* Adjust width for padding */
+        color: white;
+        z-index: 10; /* Ensure it's above other elements */
+    }
+
+    .logo {
+        font-size: 1.5em;
+        font-weight: bold;
+    }
+
+    nav a {
+        color: white;
+        text-decoration: none;
+        margin-left: 20px;
+    }
+
+    nav a:hover {
+        color: #81D4FA; /* Light blue on hover for links */
+    }
+
+    /* Responsive Design (for smaller screens) */
+    @media (max-width: 900px) {
+        .container {
+            flex-direction: column; /* Stack image and text vertically on smaller screens */
+        }
+        .image-section, .content-section {
+            flex: 0 0 100%; /* Each takes full width */
+            padding: 30px;
+            text-align: center; /* Center text on smaller screens */
+            align-items: center; /* Center items horizontally */
+        }
+        .content-section {
+            align-items: center; /* Ensure content is centered */
+        }
+        .image-section img {
+            max-width: 50%; /* Adjust image size on smaller screens */
+        }
+        header {
+            flex-direction: column; /* Stack logo and navigation */
+            align-items: center;
+            text-align: center;
+        }
+        nav {
+            margin-top: 10px;
+        }
+        nav a {
+            margin: 0 10px;
+        }
+    }
+    """
+    homepage_html = f"""
     <!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>SAMI AI</title>
-        <link rel="stylesheet" href="style.css">
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap">
         <style>
-            body {
-                font-family: 'Roboto', sans-serif;
-                margin: 0;
-                background: linear-gradient(135deg, #37474F, #263238);
-                color: #ECEFF1;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                min-height: 100vh;
-                padding: 20px;
-                box-sizing: border-box;
-            }
-            .container {
-                display: flex;
-                max-width: 1200px;
-                width: 100%;
-                background-color: rgba(0, 0, 0, 0.5);
-                border-radius: 10px;
-                overflow: hidden;
-                box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
-            }
-            .image-section {
-                flex: 0 0 50%;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                padding: 40px;
-            }
-            .image-section img {
-                max-width: 80%;
-                height: auto;
-            }
-            .content-section {
-                flex: 0 0 50%;
-                padding: 60px;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                align-items: flex-start;
-            }
-            h1 {
-                font-size: 3em;
-                margin-bottom: 10px;
-                color: #81D4FA;
-            }
-            .subtitle {
-                font-size: 1.5em;
-                color: #B0BEC5;
-                margin-bottom: 20px;
-            }
-            .description {
-                line-height: 1.6;
-                margin-bottom: 30px;
-            }
-            .get-started-button {
-                background-color: #03A9F4;
-                color: white;
-                border: none;
-                padding: 15px 30px;
-                border-radius: 5px;
-                font-size: 1.2em;
-                cursor: pointer;
-                transition: background-color 0.3s ease;
-                text-decoration: none;
-            }
-            .get-started-button:hover {
-                background-color: #0288D1;
-            }
-            header {
-                position: absolute;
-                top: 20px;
-                left: 20px;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                width: calc(100% - 40px);
-                color: white;
-                z-index: 10;
-            }
-            .logo {
-                font-size: 1.5em;
-                font-weight: bold;
-            }
-            nav a {
-                color: white;
-                text-decoration: none;
-                margin-left: 20px;
-            }
-            nav a:hover {
-                color: #81D4FA;
-            }
-            /* Responsive Design */
-            @media (max-width: 900px) {
-                .container {
-                    flex-direction: column;
-                }
-                .image-section, .content-section {
-                    flex: 0 0 100%;
-                    padding: 30px;
-                    text-align: center;
-                    align-items: center;
-                }
-                .content-section {
-                    align-items: center;
-                }
-                .hero-image img {
-                    max-width: 50%;
-                }
-            }
+            {inlined_css}
         </style>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap">
     </head>
     <body>
         <header>
@@ -134,7 +159,7 @@ def show_homepage():
         </header>
         <div class="container">
             <div class="image-section">
-                <img src="images/robot-hand.png" alt="Robot Hand">
+                <img src="data:image/png;base64,{base64_image}" alt="Robot Hand">
             </div>
             <div class="content-section">
                 <h1>SAMI AI</h1>
@@ -146,31 +171,14 @@ def show_homepage():
     </body>
     </html>
     """
-    st.components.v1.html(homepage_html, height=800) # Try removing height or increasing it
+    st.components.v1.html(homepage_html, height=800) # Adjust height if needed
 
 if 'start_app' in st.query_params:
     st.title("🤖 Welcome to SAMI AI")
     st.markdown("""
     Welcome to your all-in-one AI-powered research assistant.
     Use the sidebar to explore and analyze your data using advanced modules:
-
-    ### Available Modules:
-    - 🧠 **SAMI Analyzer** – GPT-enhanced EDA and visualization
-    - 📦 **CBC Conjoint** – Run choice-based modeling simulations
-    - 🎯 **MaxDiff Module** – Prioritization using MaxDiff scaling
-    - 🎯 **TURF Module** – Find optimal feature combinations
-    - 🔍 **Text Analytics** – Extract insights from open-ended responses
-    - 🧬 **LCA Module** – Latent Class segmentation
-    - 🔗 **SEM Module** – Structural Equation Modeling
-    - 📊 **CrossTabs Analyzer Phase 1** – Frequency, significance tests & stat tables
-    - 📈 **CrossTabs Analyzer Phase 2** – GPT-based executive summary of crosstabs
-    - 📄 **Executive Insight Generator** – Create slide-ready insight summaries
-    - 🧬 **Persona Generator** – Extract buyer personas from segmentation
-    - 🧬 **Persona From PPTX** – Generate personas from uploaded PPTX files
-
-    ---
-
-    💡 Upload your data in the respective module and let SAMI AI do the heavy lifting.
+    ... (rest of your Streamlit app content) ...
     """)
 else:
     show_homepage()
