@@ -1,5 +1,7 @@
 import streamlit as st
 
+st.set_page_config(layout="wide")
+
 def show_homepage():
     homepage_html = """
     <!DOCTYPE html>
@@ -144,10 +146,9 @@ def show_homepage():
     </body>
     </html>
     """
-    st.components.v1.html(homepage_html, height=800) # Adjust height as needed
+    st.components.v1.html(homepage_html, height=800) # Try removing height or increasing it
 
 if 'start_app' in st.query_params:
-    st.set_page_config(page_title="SAMI AI – Insights Platform", layout="wide")
     st.title("🤖 Welcome to SAMI AI")
     st.markdown("""
     Welcome to your all-in-one AI-powered research assistant.
