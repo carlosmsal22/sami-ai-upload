@@ -1,7 +1,7 @@
 import streamlit as st
 
 # Configuration - use the raw GitHub URL for your image
-IMAGE_URL = "https://raw.githubusercontent.com/yourusername/sami-ai-upload/main/images/SAMI_AI_UI_02.png"
+IMAGE_URL = "https://raw.githubusercontent.com/yourusername/sami-ai-upload/main/images/robot-hand.png"
 FALLBACK_IMAGE = "https://via.placeholder.com/600x400/37474F/ECEFF1?text=SAMI+AI"
 
 def show_homepage():
