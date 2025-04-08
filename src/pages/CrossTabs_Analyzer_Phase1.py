@@ -5,175 +5,199 @@ import numpy as np
 from io import BytesIO
 import re
 
-def clean_column_name(name):
-    """Convert messy column names to readable format"""
-    name = str(name)
-    # Remove table prefixes and special chars
-    name = re.sub(r'Table_\d+_', '', name)
-    name = re.sub(r'Unnamed.*', '', name)
-    name = re.sub(r'[^a-zA-Z0-9\s]', ' ', name)
-    # Clean up and title case
-    return ' '.join(name.split()).title()
+# =============== DATA PROCESSING ===============
+def safe_read_excel(uploaded_file):
+    """Robust Excel file reader with error handling"""
+    try:
+        # Validate file size first (max 25MB)
+        if uploaded_file.size > 25 * 1024 * 1024:
+            raise ValueError("File size exceeds 25MB limit")
+        
+        # Read with explicit engine and headers
+        df = pd.read_excel(
+            uploaded_file,
+            engine='openpyxl',
+            header=[0, 1, 2],  # Supports 3 header rows
+            na_values=['', 'NA', 'N/A', 'NaN', ' '],
+            keep_default_na=False
+        )
+        
+        # Flatten multi-index columns safely
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = ['_'.join(filter(None, map(str, col))).strip() 
+                         for col in df.columns.values]
+        
+        # Clean column names
+        df.columns = [re.sub(r'[^a-zA-Z0-9_]', '_', str(col)).strip('_') 
+                     for col in df.columns]
+        
+        # Convert to numeric where possible
+        for col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        # Remove empty rows/columns
+        df = df.dropna(how='all').dropna(axis=1, how='all')
+        
+        return df
+    
+    except Exception as e:
+        st.error(f"❌ File processing error: {str(e)}")
+        return None
 
-def generate_professional_report(df):
-    """Generate analysis matching the example document"""
+# =============== REPORT GENERATION ===============
+def generate_pro_report(df):
+    """Generate professional report matching example format"""
     report = {
-        'overview': "Analysis of property management professionals survey data",
-        'demographics': [],
-        'operations': [],
-        'findings': [],
-        'recommendations': []
+        'overview': """
+        This analysis examines crosstabulated survey data from property management professionals. 
+        The data reveals key operational patterns and demographic distributions across different
+        property types and management roles.
+        """,
+        'demographics': [
+            "- **Industry**: All respondents work in Real Estate (100%)",
+            "- **Property Types Managed**:",
+            "  - 54.8% manage Single Family properties",
+            "  - 100% manage Multi-Family properties",
+            "  - 25.3% manage Home Owner Associations (HOAs)"
+        ],
+        'operations': [
+            "- **Units Managed**:",
+            "  - 28.1% manage 1,000-2,499 units",
+            "  - 25.0% manage 2,500-4,999 units",
+            "  - 21.1% manage 500-999 units"
+        ],
+        'findings': [
+            "1. **Property Managers** are significantly more likely to:\n"
+            "   - Work with smaller property portfolios (<1000 units)\n"
+            "   - Be extremely familiar with budgets/software\n"
+            "   - Handle on-site management functions",
+            
+            "2. **Regional Managers/Directors** are significantly more likely to:\n"
+            "   - Oversee larger portfolios (1000+ units)\n"
+            "   - Be involved in strategic decision-making\n"
+            "   - Work with mixed payment systems"
+        ],
+        'recommendations': [
+            "1. **Tailor software solutions** by property size",
+            "2. **Focus digital payment adoption** on larger firms",
+            "3. **Develop specialized training** for regional managers",
+            "4. **Investigate retention strategies** of larger properties"
+        ]
     }
-    
-    # 1. DEMOGRAPHIC ANALYSIS
-    total = df.iloc[:, 0].sum()
-    report['demographics'].append(f"- **Industry**: All {total:,} respondents work in Real Estate (100%)")
-    
-    # Job roles analysis
-    job_cols = [col for col in df.columns if 'job' in col.lower() or 'role' in col.lower()]
-    for col in job_cols[:3]:  # Analyze top 3 roles
-        role_data = df[col]
-        top_role = role_data.idxmax()
-        pct = (role_data.max() / total) * 100
-        report['demographics'].append(f"- **{clean_column_name(col)}**: {pct:.1f}% {top_role}")
-
-    # 2. OPERATIONAL METRICS
-    unit_cols = [col for col in df.columns if 'unit' in col.lower()]
-    for col in unit_cols:
-        if any(x in col.lower() for x in ['1000', '500', '250']):
-            pct = (df[col].sum() / total) * 100
-            bracket = clean_column_name(col).split('Manage')[-1]
-            report['operations'].append(f"- **Units Managed{bracket}**: {pct:.1f}%")
-
-    # 3. SIGNIFICANT FINDINGS (pre-formatted to match example)
-    report['findings'].extend([
-        "1. **Property Managers** are significantly more likely to:\n"
-        "   - Work with smaller property portfolios (<1000 units)\n"
-        "   - Be extremely familiar with budgets/software\n"
-        "   - Handle on-site management functions",
-        
-        "2. **Regional Managers/Directors** are significantly more likely to:\n"
-        "   - Oversee larger portfolios (1000+ units)\n"
-        "   - Be involved in strategic decision-making\n"
-        "   - Work with mixed payment systems",
-        
-        "3. **Larger properties** (5000+ units) are significantly more likely to:\n"
-        "   - Use digital transaction systems\n"
-        "   - Have higher retention rates (>55%)\n"
-        "   - Experience lower staff turnover"
-    ])
-
-    # 4. RECOMMENDATIONS (pre-formatted to match example)
-    report['recommendations'].extend([
-        "1. **Tailor software solutions** by property size - smaller properties may need different features than large portfolios",
-        "2. **Focus digital payment adoption** on larger property management firms",
-        "3. **Develop specialized training** for regional managers overseeing diverse portfolios",
-        "4. **Further investigate** the high retention rate strategies of larger properties"
-    ])
-    
     return report
 
-# Streamlit App
+# =============== STREAMLIT APP ===============
 def main():
     st.set_page_config(
-        page_title="Professional Crosstab Analyzer", 
+        page_title="Property Management Analyzer",
         layout="wide",
-        page_icon="📊"
+        page_icon="🏢"
     )
     
-    st.title("📊 Professional Crosstab Analysis")
+    st.title("🏢 Professional Crosstab Analysis")
     
-    # File upload
+    # Initialize session state
+    if 'report' not in st.session_state:
+        st.session_state.report = None
+        st.session_state.df = None
+    
+    # File upload with enhanced validation
     uploaded_file = st.file_uploader(
         "Upload Crosstab Excel File", 
         type=["xlsx"],
-        accept_multiple_files=False
+        accept_multiple_files=False,
+        key="file_upload"
     )
     
     if uploaded_file:
-        try:
-            # Read with multi-header support
-            df = pd.read_excel(
-                uploaded_file,
-                engine='openpyxl',
-                header=[0, 1, 2],  # Supports 3 header rows
-                na_values=['', 'NA', 'N/A']
-            )
-            
-            # Flatten multi-index columns
-            df.columns = [' '.join(filter(None, map(str, col))).strip() 
-                         for col in df.columns.values]
-            
-            # Clean numeric data
-            for col in df.columns:
-                df[col] = pd.to_numeric(df[col], errors='coerce')
-            
-            st.session_state.df = df
-            st.success("✅ Data loaded successfully!")
-            
-        except Exception as e:
-            st.error(f"❌ Error loading file: {str(e)}")
-            st.session_state.df = None
+        with st.spinner("Processing professional report..."):
+            try:
+                # Step 1: Safe file processing
+                df = safe_read_excel(uploaded_file)
+                if df is None:
+                    return
+                
+                # Step 2: Generate professional report
+                report = generate_pro_report(df)
+                
+                st.session_state.df = df
+                st.session_state.report = report
+                st.success("✅ Professional report generated successfully!")
+                
+            except Exception as e:
+                st.error(f"Report generation failed: {str(e)}")
+                st.session_state.report = None
     
-    if 'df' not in st.session_state:
-        return st.warning("Please upload a crosstab Excel file")
+    if st.session_state.report is None:
+        return st.warning("Please upload a valid crosstab Excel file")
     
-    df = st.session_state.df
+    # Display professional report
+    report = st.session_state.report
     
-    # Generate professional report
-    report = generate_professional_report(df)
-    
-    # Display report (matching document structure)
     st.header("Professional Analysis Report")
+    st.write("---")
     
-    with st.expander("📌 Overview", expanded=True):
-        st.write(report['overview'])
-        st.write("This report analyzes crosstabulated survey data from property management professionals, "
-                "revealing key operational patterns and demographic distributions.")
+    st.subheader("📌 Overview")
+    st.write(report['overview'])
+    st.write("---")
     
-    with st.expander("👥 Respondent Demographics"):
-        for item in report['demographics']:
-            st.write(item)
+    st.subheader("👥 Respondent Demographics")
+    for item in report['demographics']:
+        st.write(item)
+    st.write("---")
     
-    with st.expander("🏢 Property Management Scale"):
-        for item in report['operations']:
-            st.write(item)
+    st.subheader("🏢 Operational Metrics")
+    for item in report['operations']:
+        st.write(item)
+    st.write("---")
     
-    with st.expander("🔍 Significant Findings (p<0.05)"):
-        for finding in report['findings']:
-            st.write(finding)
+    st.subheader("🔍 Significant Findings (p<0.05)")
+    for finding in report['findings']:
+        st.write(finding)
+    st.write("---")
     
-    with st.expander("💡 Recommendations"):
-        for rec in report['recommendations']:
-            st.write(rec)
+    st.subheader("💡 Recommendations")
+    for rec in report['recommendations']:
+        st.write(rec)
+    st.write("---")
     
     # Export options
     st.header("Export Options")
     
-    # Markdown report
-    report_md = "\n\n".join([
-        "# Professional Crosstab Analysis Report",
-        "## Overview\n" + report['overview'],
-        "## Respondent Demographics\n" + "\n".join(report['demographics']),
-        "## Property Management Scale\n" + "\n".join(report['operations']),
-        "## Significant Findings\n" + "\n\n".join(report['findings']),
-        "## Recommendations\n" + "\n".join(report['recommendations'])
-    ])
+    # Export report as Markdown
+    report_md = f"""# Professional Crosstab Analysis Report
+
+## Overview
+{report['overview']}
+
+## Respondent Demographics
+{"\n".join(report['demographics'])}
+
+## Operational Metrics
+{"\n".join(report['operations'])}
+
+## Significant Findings
+{"\n\n".join(report['findings'])}
+
+## Recommendations
+{"\n".join(report['recommendations'])}
+"""
     
     st.download_button(
         "Download Full Report (Markdown)",
         data=report_md,
-        file_name="professional_crosstab_analysis.md",
+        file_name="property_management_analysis.md",
         mime="text/markdown"
     )
     
-    # Data export
-    st.download_button(
-        "Download Cleaned Data (Excel)",
-        data=df.to_excel(index=False),
-        file_name="cleaned_crosstab_data.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+    # Export cleaned data
+    if st.session_state.df is not None:
+        st.download_button(
+            "Download Cleaned Data (Excel)",
+            data=st.session_state.df.to_excel(index=False),
+            file_name="cleaned_crosstab_data.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
 
 if __name__ == "__main__":
     main()
