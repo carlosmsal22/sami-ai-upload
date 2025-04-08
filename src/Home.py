@@ -1,12 +1,20 @@
 import streamlit as st
-from streamlit_javascript import st_javascript  # For proper redirection
 
 # Configuration
 GITHUB_USER = "yourusername"  # Replace with your GitHub username
 REPO_NAME = "sami-ai-upload"  # Your repository name
-IMAGE_PATH = "images/robot-hand.png"  # Corrected image path
-IMAGE_URL = f"https://raw.githubusercontent.com/{GITHUB_USER}/{REPO_NAME}/main/{IMAGE_PATH}"
-MAIN_APP_URL = "/"  # Or your specific app route
+IMAGE_PATH = "images/robot-hand.png"  # Correct image path
+IMAGE_URL = f"https://raw.githubusercontent.com/{GITHUB_USER}/{REPO_NAME}/main/{IMAGE_PATH}?raw=true"
+
+def main_app():
+    st.title("🤖 Welcome to SAMI AI")
+    st.markdown("""
+    Welcome to your all-in-one AI-powered research assistant.
+    Use the sidebar to explore and analyze your data using advanced modules:
+    - Market Trends Analysis
+    - Technology Forecasting
+    - Consumer Behavior Insights
+    """)
 
 def show_homepage():
     # Page setup
@@ -67,16 +75,12 @@ def show_homepage():
     col1, col2 = st.columns([0.6, 0.4], gap="large")
     
     with col1:
-        try:
-            st.markdown(f"""
-            <div class="image-container">
-                <img src="{IMAGE_URL}" 
-                     style="max-width:100%; max-height:70vh; object-fit: contain; border-radius: 8px;"/>
-            </div>
-            """, unsafe_allow_html=True)
-        except:
-            st.error("Image failed to load. Please check:")
-            st.code(f"Image URL: {IMAGE_URL}")
+        st.markdown(f"""
+        <div class="image-container">
+            <img src="{IMAGE_URL}" 
+                 style="max-width:100%; max-height:70vh; object-fit: contain; border-radius: 8px;"/>
+        </div>
+        """, unsafe_allow_html=True)
     
     with col2:
         st.markdown("<h1 style='color: #81D4FA; margin-top: 0;'>SAMI AI</h1>", unsafe_allow_html=True)
@@ -90,16 +94,12 @@ def show_homepage():
         """, unsafe_allow_html=True)
         
         if st.button("Get Started", type="primary", use_container_width=True):
-            # Proper page navigation
-            js = f"window.location.href = '{MAIN_APP_URL}'"
-            st_javascript(js)
+            # Set query parameter to trigger app view
+            st.query_params["app"] = True
+            st.rerun()
 
 # App routing
-if 'start_app' in st.query_params:
-    st.title("🤖 Welcome to SAMI AI")
-    st.markdown("""
-    Welcome to your all-in-one AI-powered research assistant.
-    Use the sidebar to explore and analyze your data using advanced modules:
-    """)
+if "app" in st.query_params:
+    main_app()
 else:
     show_homepage()
