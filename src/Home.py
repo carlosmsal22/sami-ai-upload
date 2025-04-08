@@ -145,6 +145,7 @@ nav a:hover {
         margin: 0 10px;
     }
 }
+"""
     homepage_html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
