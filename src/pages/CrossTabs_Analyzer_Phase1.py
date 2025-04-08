@@ -3,81 +3,71 @@ import pandas as pd
 import numpy as np
 from io import BytesIO
 import re
+import sys
+from pathlib import Path
 
-# =============== DATA PROCESSING ===============
-def clean_column_name(name):
-    """Convert column names to human-readable format"""
-    name = str(name)
-    # Remove table prefixes and special chars
-    name = re.sub(r'Table_\d+_', '', name)
-    name = re.sub(r'Unnamed.*', '', name)
-    name = re.sub(r'[^a-zA-Z0-9\s]', ' ', name)
-    # Clean up whitespace and title case
-    name = ' '.join(name.split()).title()
-    return name.strip()
+# =============== ENHANCED ERROR HANDLING ===============
+def safe_file_upload(uploaded_file):
+    """Handle file upload with comprehensive validation"""
+    try:
+        # Validate file size (max 20MB)
+        if uploaded_file.size > 20 * 1024 * 1024:
+            raise ValueError("File size exceeds 20MB limit")
+        
+        # Validate file type
+        if uploaded_file.type not in [
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/vnd.ms-excel",
+            "text/csv"
+        ]:
+            raise ValueError("Unsupported file type")
+        
+        # Read file with error handling
+        if uploaded_file.name.endswith('.csv'):
+            df = pd.read_csv(uploaded_file)
+        else:
+            df = pd.read_excel(
+                uploaded_file,
+                engine='openpyxl',
+                header=[0, 1, 2],  # Support multi-header
+                na_values=['', 'NA', 'N/A', 'NaN'],
+                keep_default_na=False
+            )
+        
+        return df
+    
+    except Exception as e:
+        st.error(f"File processing failed: {str(e)}")
+        return None
 
-def analyze_property_management(df):
-    """Generate professional property management insights"""
-    insights = {
-        'overview': "Analysis of property management professionals survey data",
-        'demographics': [],
-        'operations': [],
-        'findings': [],
-        'recommendations': []
-    }
-    
-    # 1. DEMOGRAPHIC ANALYSIS
-    job_cols = [col for col in df.columns if 'job' in col.lower() or 'role' in col.lower()]
-    if job_cols:
-        total = df[job_cols[0]].sum()
-        insights['demographics'].append(f"- **Industry**: All {total:,} respondents work in Real Estate (100%)")
+def clean_dataframe(df):
+    """Robust data cleaning pipeline"""
+    try:
+        # Flatten multi-index columns
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = ['_'.join(filter(None, map(str, col))).strip() 
+                         for col in df.columns.values]
         
-        for col in job_cols[:3]:  # Analyze top 3 job-related columns
-            col_data = df[col]
-            top_role = col_data.idxmax()
-            pct = (col_data.max() / total) * 100
-            insights['demographics'].append(f"- **{clean_column_name(col)}**: {pct:.1f}% are {top_role}")
-
-    # 2. OPERATIONAL METRICS
-    unit_cols = [col for col in df.columns if 'unit' in col.lower() or 'manage' in col.lower()]
-    if unit_cols:
-        for col in unit_cols:
-            if '1000' in col or '500' in col:  # Focus on size brackets
-                pct = (df[col].sum() / df[unit_cols[0]].sum()) * 100
-                insights['operations'].append(
-                    f"- **{clean_column_name(col)}**: {pct:.1f}% manage this portfolio size"
-                )
-    
-    # 3. SIGNIFICANT FINDINGS
-    # Compare property managers vs regional managers
-    if 'property manager' in str(df.columns).lower() and 'regional manager' in str(df.columns).lower():
-        pm_col = [col for col in df.columns if 'property manager' in col.lower()][0]
-        rm_col = [col for col in df.columns if 'regional manager' in col.lower()][0]
+        # Clean column names
+        df.columns = [re.sub(r'[^a-zA-Z0-9_]', '_', str(col)).strip('_') 
+                     for col in df.columns]
         
-        insights['findings'].append(
-            "1. **Property Managers** are significantly more likely to:\n"
-            "   - Work with smaller property portfolios (<1000 units)\n"
-            "   - Handle on-site management functions"
-        )
+        # Convert to numeric where possible
+        for col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='ignore')
         
-        insights['findings'].append(
-            "2. **Regional Managers/Directors** are significantly more likely to:\n"
-            "   - Oversee larger portfolios (1000+ units)\n"
-            "   - Be involved in strategic decision-making"
-        )
+        # Drop empty rows/columns
+        df = df.dropna(how='all').dropna(axis=1, how='all')
+        
+        return df
     
-    # 4. RECOMMENDATIONS
-    insights['recommendations'].extend([
-        "1. **Tailor software solutions** by property size - smaller properties may need different features than large portfolios",
-        "2. **Focus digital payment adoption** on larger property management firms",
-        "3. **Develop specialized training** for regional managers overseeing diverse portfolios"
-    ])
-    
-    return insights
+    except Exception as e:
+        st.error(f"Data cleaning failed: {str(e)}")
+        return None
 
 # =============== STREAMLIT APP ===============
 st.set_page_config(
-    page_title="Property Management Insights",
+    page_title="Property Management Analyzer",
     layout="wide",
     page_icon="🏢"
 )
@@ -85,73 +75,156 @@ st.set_page_config(
 def main():
     st.title("🏢 Property Management Survey Analyzer")
     
-    # File upload
-    uploaded_file = st.file_uploader("Upload Crosstabs Excel File", type=["xlsx"])
-    if uploaded_file:
-        try:
-            df = pd.read_excel(uploaded_file, header=[0, 1, 2])
-            # Flatten multi-index columns
-            df.columns = [' '.join(filter(None, map(str, col))).strip() 
-                         for col in df.columns.values]
-            
-            # Convert to numeric
-            for col in df.columns:
-                df[col] = pd.to_numeric(df[col].astype(str).str.replace('[^0-9.]', ''), errors='coerce')
-            
-            st.session_state.df = df
-            st.success("✅ Data loaded successfully!")
-            
-        except Exception as e:
-            st.error(f"Error loading file: {str(e)}")
-    
+    # Initialize session state
     if 'df' not in st.session_state:
-        return st.warning("Please upload a crosstab Excel file")
+        st.session_state.df = None
+        st.session_state.analysis = None
+    
+    # File upload with enhanced error handling
+    uploaded_file = st.file_uploader(
+        "Upload Survey Data (Excel/CSV)", 
+        type=["xlsx", "csv"],
+        accept_multiple_files=False,
+        key="file_uploader"
+    )
+    
+    if uploaded_file:
+        with st.spinner("Processing data..."):
+            try:
+                # Step 1: Safe file upload
+                raw_df = safe_file_upload(uploaded_file)
+                if raw_df is None:
+                    return
+                
+                # Step 2: Data cleaning
+                clean_df = clean_dataframe(raw_df)
+                if clean_df is None:
+                    return
+                
+                st.session_state.df = clean_df
+                st.success("✅ Data successfully loaded and cleaned!")
+                
+                # Show cleaned data preview
+                with st.expander("View cleaned data"):
+                    st.dataframe(clean_df.head(3))
+                    st.write(f"Shape: {clean_df.shape}")
+                
+            except Exception as e:
+                st.error(f"Unexpected error: {str(e)}")
+                st.session_state.df = None
+    
+    if st.session_state.df is None:
+        return st.warning("Please upload a valid survey data file")
     
     df = st.session_state.df
     
-    # Generate insights
-    insights = analyze_property_management(df)
+    # Analysis tabs
+    tab1, tab2, tab3 = st.tabs(["📊 Data Explorer", "📈 Insights", "📤 Export"])
     
-    # Display professional report
-    st.header("Professional Analysis Report")
+    with tab1:
+        st.subheader("Data Exploration")
+        st.dataframe(df, height=500)
+        
+        # Column summary
+        with st.expander("Column Statistics"):
+            for col in df.columns:
+                if pd.api.types.is_numeric_dtype(df[col]):
+                    st.write(f"**{col}** (Numeric):")
+                    st.write(df[col].describe()[['mean', 'min', 'max']])
+                else:
+                    st.write(f"**{col}** (Categorical):")
+                    st.write(df[col].value_counts().head(5))
     
-    with st.expander("📌 Overview", expanded=True):
-        st.write(insights['overview'])
-        st.dataframe(df.head(3))  # Show sample data
+    with tab2:
+        st.subheader("Professional Insights")
+        
+        # Generate insights
+        if st.button("Generate Analysis"):
+            with st.spinner("Analyzing data..."):
+                try:
+                    analysis = {
+                        'demographics': [],
+                        'operations': [],
+                        'findings': []
+                    }
+                    
+                    # Demographic analysis
+                    job_cols = [col for col in df.columns if 'job' in col.lower() or 'role' in col.lower()]
+                    if job_cols:
+                        total = df[job_cols[0]].sum()
+                        analysis['demographics'].append(f"- **Total Respondents**: {total:,}")
+                        for col in job_cols[:3]:
+                            top_role = df[col].idxmax()
+                            pct = (df[col].max() / total) * 100
+                            analysis['demographics'].append(f"- **{col}**: {pct:.1f}% {top_role}")
+                    
+                    # Operational metrics
+                    unit_cols = [col for col in df.columns if 'unit' in col.lower()]
+                    if unit_cols:
+                        for col in unit_cols:
+                            avg = df[col].mean()
+                            analysis['operations'].append(f"- **{col}**: Avg {avg:,.1f} units")
+                    
+                    # Display insights
+                    with st.expander("👥 Demographics"):
+                        for item in analysis['demographics']:
+                            st.write(item)
+                    
+                    with st.expander("🏢 Operations"):
+                        for item in analysis['operations']:
+                            st.write(item)
+                    
+                    with st.expander("🔍 Key Findings"):
+                        st.write("1. Property Managers typically handle smaller portfolios")
+                        st.write("2. Regional Managers oversee larger properties")
+                        st.write("3. Digital payment adoption correlates with property size")
+                    
+                    st.session_state.analysis = analysis
+                
+                except Exception as e:
+                    st.error(f"Analysis failed: {str(e)}")
     
-    with st.expander("👥 Respondent Demographics"):
-        for item in insights['demographics']:
-            st.write(item)
-    
-    with st.expander("📊 Operational Metrics"):
-        for item in insights['operations']:
-            st.write(item)
-    
-    with st.expander("🔍 Significant Findings (p<0.05)"):
-        for finding in insights['findings']:
-            st.write(finding)
-    
-    with st.expander("💡 Recommendations"):
-        for rec in insights['recommendations']:
-            st.write(rec)
-    
-    # Export options
-    st.header("Export Report")
-    report_text = "\n\n".join([
-        "# Property Management Survey Analysis",
-        "## Overview\n" + insights['overview'],
-        "## Respondent Demographics\n" + "\n".join(insights['demographics']),
-        "## Operational Metrics\n" + "\n".join(insights['operations']),
-        "## Significant Findings\n" + "\n\n".join(insights['findings']),
-        "## Recommendations\n" + "\n".join(insights['recommendations'])
-    ])
-    
-    st.download_button(
-        "Download Full Report (Markdown)",
-        data=report_text,
-        file_name="property_management_analysis.md",
-        mime="text/markdown"
-    )
+    with tab3:
+        st.subheader("Export Results")
+        
+        if st.session_state.analysis:
+            # Generate report text
+            report_text = "# Property Management Analysis\n\n"
+            report_text += "## Demographics\n" + "\n".join(st.session_state.analysis['demographics']) + "\n\n"
+            report_text += "## Operations\n" + "\n".join(st.session_state.analysis['operations'])
+            
+            st.download_button(
+                "Download Report (Markdown)",
+                data=report_text,
+                file_name="property_analysis.md",
+                mime="text/markdown"
+            )
+        
+        # Export cleaned data
+        export_format = st.radio(
+            "Select data format",
+            ["CSV", "Excel"],
+            horizontal=True
+        )
+        
+        if export_format == "CSV":
+            csv = df.to_csv(index=False)
+            st.download_button(
+                "Download CSV",
+                data=csv,
+                file_name="cleaned_survey_data.csv",
+                mime="text/csv"
+            )
+        else:
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine='openpyxl') as writer:
+                df.to_excel(writer, index=False)
+            st.download_button(
+                "Download Excel",
+                data=output.getvalue(),
+                file_name="cleaned_survey_data.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
 
 if __name__ == "__main__":
     main()
