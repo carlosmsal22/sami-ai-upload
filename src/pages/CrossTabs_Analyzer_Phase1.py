@@ -6,9 +6,20 @@ from io import BytesIO
 import matplotlib.pyplot as plt
 import altair as alt
 
-# =============== DATA PROCESSING ===============
-def convert_to_numeric(df):
-    """Automatically detect and convert numeric columns"""
+# =============== DATA CLEANING ===============
+def clean_data(df):
+    """Handle all data cleaning and type conversion"""
+    # Clean column names
+    if isinstance(df.columns, pd.MultiIndex):
+        df.columns = ['_'.join(filter(None, map(str, col))).strip() 
+                     for col in df.columns.values]
+    else:
+        df.columns = [str(col).strip() for col in df.columns]
+    
+    # Replace empty strings with NaN
+    df = df.replace(r'^\s*$', np.nan, regex=True)
+    
+    # Convert numeric columns
     for col in df.columns:
         # Skip if already numeric
         if pd.api.types.is_numeric_dtype(df[col]):
@@ -16,27 +27,40 @@ def convert_to_numeric(df):
             
         # Try converting to numeric
         try:
-            df[col] = pd.to_numeric(df[col], errors='raise')
-            st.sidebar.success(f"Converted {col} to numeric")
+            # Handle percentage strings
+            if df[col].astype(str).str.contains('%').any():
+                df[col] = pd.to_numeric(
+                    df[col].astype(str).str.replace('%', ''),
+                    errors='coerce'
+                ) / 100
+            # Handle regular numbers
+            else:
+                df[col] = pd.to_numeric(
+                    df[col].astype(str).str.replace(',', ''),
+                    errors='coerce'
+                )
         except:
-            # If conversion fails, keep as-is
             pass
+    
+    # Drop completely empty columns
+    df = df.dropna(axis=1, how='all')
+    
     return df
 
 # =============== STREAMLIT APP ===============
 st.set_page_config(
-    page_title="CrossTabs Analyzer",
+    page_title="Survey Data Analyzer",
     layout="wide",
     page_icon="📊"
 )
 
 def main():
-    st.title("📊 CrossTab Analyzer")
+    st.title("📊 Survey Data Analyzer")
     
-    # File upload with automatic type conversion
-    uploaded_file = st.file_uploader("Upload Excel/CSV", type=["xlsx", "csv"])
+    # File upload with enhanced cleaning
+    uploaded_file = st.file_uploader("Upload Survey Data", type=["xlsx", "csv"])
     if uploaded_file:
-        with st.spinner("Processing file..."):
+        with st.spinner("Processing survey data..."):
             try:
                 if uploaded_file.name.endswith('.csv'):
                     df = pd.read_csv(uploaded_file)
@@ -44,117 +68,136 @@ def main():
                     df = pd.read_excel(
                         uploaded_file,
                         engine='openpyxl',
-                        header=[0, 1, 2]
+                        header=[0, 1, 2]  # Handle multi-header surveys
                     )
-                    # Flatten multi-index columns
-                    df.columns = ['_'.join(filter(None, map(str, col))).strip() 
-                                 for col in df.columns.values]
                 
-                # Auto-convert compatible columns
-                df = convert_to_numeric(df)
+                df = clean_data(df)
                 st.session_state.df = df
-                st.success("✅ File loaded successfully!")
+                st.success("✅ Survey data loaded successfully!")
+                
+                # Debug view
+                with st.expander("View cleaned data"):
+                    st.write(df.head(3))
+                    st.write("Column types:", df.dtypes)
+                    
             except Exception as e:
-                st.error(f"🚨 Error loading file: {str(e)}")
+                st.error(f"🚨 Error loading survey data: {str(e)}")
                 st.session_state.df = None
     
     if 'df' not in st.session_state or st.session_state.df is None:
-        return st.warning("Please upload a file to begin")
+        return st.warning("Please upload survey data file to begin")
     
     df = st.session_state.df
     
     # Main tabs
     tab1, tab2, tab3, tab4 = st.tabs([
-        "🧪 Stats", 
+        "📋 Overview", 
         "📈 Analytics", 
         "💡 Insights", 
         "📤 Export"
     ])
     
-    # =============== STATS TAB ===============
+    # =============== OVERVIEW TAB ===============
     with tab1:
-        st.subheader("Statistical Analysis")
-        stats = df.describe(include='all')
-        st.dataframe(stats)
+        st.subheader("Survey Data Overview")
+        st.dataframe(df, height=400)
         
-        # Show distribution for numeric columns
-        num_cols = df.select_dtypes(include=np.number).columns.tolist()
-        if num_cols:
-            col = st.selectbox("Select column for distribution", num_cols, key='dist_col')
-            fig, ax = plt.subplots()
-            df[col].plot(kind='hist', ax=ax)
-            st.pyplot(fig)
-        else:
-            st.warning("No numeric columns found for visualization")
+        # Show column summaries
+        with st.expander("Column Details"):
+            for col in df.columns:
+                st.write(f"**{col}** ({df[col].dtype})")
+                if pd.api.types.is_numeric_dtype(df[col]):
+                    st.write(df[col].describe()[['mean', 'min', 'max']])
+                else:
+                    st.write(df[col].value_counts().head(5))
     
     # =============== ANALYTICS TAB ===============
     with tab2:
-        st.subheader("Data Analytics")
+        st.subheader("Survey Analytics")
         num_cols = df.select_dtypes(include=np.number).columns.tolist()
         
         if len(num_cols) >= 2:
             col1, col2 = st.columns(2)
             with col1:
-                x_col = st.selectbox("X-axis column", num_cols, key='x_axis')
+                x_col = st.selectbox("X-axis (Question)", num_cols)
             with col2:
-                y_col = st.selectbox("Y-axis column", num_cols, key='y_axis')
+                y_col = st.selectbox("Y-axis (Question)", num_cols)
             
-            chart = alt.Chart(df).mark_circle().encode(
+            # Interactive scatter plot
+            chart = alt.Chart(df).mark_circle(size=60).encode(
                 x=x_col,
                 y=y_col,
-                tooltip=list(df.columns[:3])
-            )
+                tooltip=list(df.columns)
+            ).interactive()
             st.altair_chart(chart, use_container_width=True)
+            
+            # Correlation heatmap
+            st.subheader("Question Correlations")
+            corr = df[num_cols].corr()
+            st.dataframe(corr.style.background_gradient(cmap='coolwarm'))
         else:
-            st.warning("Need at least 2 numeric columns for analytics")
+            st.warning("Need at least 2 numeric questions for analytics")
             
-            # Show conversion suggestions
-            st.info("Potential columns to convert to numeric:")
-            convert_candidates = []
-            for col in df.columns:
-                if pd.api.types.is_string_dtype(df[col]):
-                    sample = df[col].head(1).values[0]
-                    if str(sample).replace('.','',1).isdigit():
-                        convert_candidates.append(col)
+            # Show conversion candidates
+            st.info("Potential questions to convert to numeric:")
+            candidates = [
+                col for col in df.columns 
+                if df[col].astype(str).str.replace('.','',1).str.isdigit().any()
+            ]
             
-            if convert_candidates:
-                for col in convert_candidates:
+            if candidates:
+                for col in candidates:
                     st.write(f"- {col}")
-                if st.button("Auto-convert suggested columns"):
-                    df[convert_candidates] = df[convert_candidates].apply(pd.to_numeric, errors='coerce')
+                if st.button("Convert these questions"):
+                    df[candidates] = df[candidates].apply(pd.to_numeric, errors='coerce')
                     st.session_state.df = df
                     st.rerun()
             else:
-                st.write("No obvious numeric columns found in text data")
+                st.write("No obvious numeric questions found in text responses")
     
     # =============== INSIGHTS TAB ===============
     with tab3:
-        st.subheader("Data Insights")
+        st.subheader("Survey Insights")
         
         insights = []
         for col in df.columns:
             try:
                 if pd.api.types.is_numeric_dtype(df[col]):
+                    # Skip non-informative numeric columns
+                    if df[col].nunique() < 2:
+                        continue
+                        
                     stats = df[col].describe()
                     insights.append(
-                        f"📌 **{col}**: "
-                        f"Avg={stats.get('mean', 0):.2f}, "
-                        f"Range={stats.get('min', 0):.2f}-{stats.get('max', 0):.2f}"
+                        f"🔢 **{col.replace('_', ' ')}**: "
+                        f"Average {stats['mean']:.1f} "
+                        f"(Range: {stats['min']:.1f}-{stats['max']:.1f})"
                     )
                 else:
+                    # Skip empty columns
+                    if df[col].isna().all():
+                        continue
+                        
                     mode = df[col].mode()
                     top_val = mode[0] if not mode.empty else "N/A"
-                    freq = df[col].value_counts(normalize=True).iloc[0] if len(df[col]) > 0 else 0
-                    insights.append(f"🏷 **{col}**: Most common = '{top_val}' ({freq:.1%})")
+                    freq = df[col].value_counts(normalize=True).iloc[0] if len(df[col].dropna()) > 0 else 0
+                    insights.append(
+                        f"🏷 **{col.replace('_', ' ')}**: "
+                        f"Most common response '{top_val}' ({freq:.1%})"
+                    )
             except:
-                insights.append(f"❌ Could not analyze column: {col}")
+                pass
         
-        for insight in insights[:15]:
-            st.info(insight)
+        if insights:
+            st.info("Key findings from survey responses:")
+            for insight in insights[:10]:  # Show top 10 insights
+                st.write(insight)
+        else:
+            st.warning("No meaningful insights could be generated")
     
     # =============== EXPORT TAB ===============
     with tab4:
-        st.subheader("Export Data")
+        st.subheader("Export Survey Data")
         export_format = st.radio(
             "Select format",
             ["CSV", "Excel", "JSON"],
@@ -165,7 +208,7 @@ def main():
             st.download_button(
                 "Download CSV",
                 data=df.to_csv(index=False),
-                file_name="data_export.csv",
+                file_name="survey_results.csv",
                 mime="text/csv"
             )
         elif export_format == "Excel":
@@ -175,14 +218,14 @@ def main():
             st.download_button(
                 "Download Excel",
                 data=output.getvalue(),
-                file_name="data_export.xlsx",
+                file_name="survey_results.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
         elif export_format == "JSON":
             st.download_button(
                 "Download JSON",
                 data=df.to_json(orient='records'),
-                file_name="data_export.json",
+                file_name="survey_results.json",
                 mime="application/json"
             )
 
