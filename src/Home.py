@@ -1,11 +1,5 @@
 import streamlit as st
 
-# Configuration
-GITHUB_USER = "yourusername"  # Replace with your GitHub username
-REPO_NAME = "sami-ai-upload"  # Your repository name
-IMAGE_PATH = "images/robot-hand.png"  # Correct image path
-IMAGE_URL = f"https://raw.githubusercontent.com/{GITHUB_USER}/{REPO_NAME}/main/{IMAGE_PATH}?raw=true"
-
 def main_app():
     st.title("🤖 Welcome to SAMI AI")
     st.markdown("""
