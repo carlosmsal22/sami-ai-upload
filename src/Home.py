@@ -138,7 +138,6 @@ nav a:hover {
     }
 }
 """
-
     homepage_html = f"""
     <!DOCTYPE html>
     <html lang="en">
