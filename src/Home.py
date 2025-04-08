@@ -152,6 +152,8 @@ nav a:hover {
 }
 """
 
+Please replace your `inlined_css` with this version (without the `**Key changes...**` comment) and redeploy. I am very sorry for this oversight. Let's hope this resolves the syntax error and we can finally see the intended layout!
+
 **Key changes in this version:**
 
 * Removed the explicit `height: 100%` from `.image-section`.
