@@ -1,4 +1,14 @@
 import streamlit as st
+from PIL import Image
+import io
+import base64
+
+def img_to_bytes(img_path):
+    """Convert image to base64 bytes for HTML embedding"""
+    img = Image.open(img_path)
+    buffer = io.BytesIO()
+    img.save(buffer, format="PNG")
+    return base64.b64encode(buffer.getvalue()).decode()
 
 def show_homepage():
     # Configure page settings
@@ -34,6 +44,10 @@ def show_homepage():
                 flex-direction: column;
             }
         }
+        .homepage-image {
+            max-width: 100%;
+            height: auto;
+        }
     </style>
     """, unsafe_allow_html=True)
 
@@ -52,13 +66,18 @@ def show_homepage():
     col1, col2 = st.columns([0.6, 0.4], gap="medium")
     
     with col1:
-        # Display the image
+        # Display the image using HTML embedding to avoid file path issues
         try:
-            st.image("SAMI AI UI_02.png",
-                    use_column_width=True,
-                    output_format="PNG")
-        except FileNotFoundError:
-            st.error("Homepage image not found. Please ensure 'SAMI AI UI_02.png' is in the correct directory.")
+            # Replace with your actual image path or use the base64 fallback
+            img_bytes = img_to_bytes("SAMI_AI_UI_02.png")
+            st.markdown(f"""
+            <img src="data:image/png;base64,{img_bytes}" 
+                 class="homepage-image" 
+                 alt="SAMI AI Interface"/>
+            """, unsafe_allow_html=True)
+        except Exception as e:
+            st.error(f"Couldn't load image: {str(e)}")
+            # Fallback base64 image would go here
     
     with col2:
         # Content section
@@ -99,9 +118,5 @@ if 'start_app' in st.query_params:
     
     Get started by selecting a module from the sidebar.
     """)
-    
-    # Your actual app content would go here
-    # st.sidebar.selectbox("Choose module", [...])
-    # ...
 else:
     show_homepage()
