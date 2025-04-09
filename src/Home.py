@@ -141,41 +141,51 @@ def show_homepage():
     """
 
 homepage_html = f"""
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SAMI AI</title>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap">
-    <style>
-        body {{ margin: 0; }}
-    </style>
-</head>
-<body class="homepage-body">
-    <header style="position: absolute; top: 20px; left: 20px; color: white; z-index: 10; border: 1px solid red; padding: 5px;">
-        <div class="logo" style="font-size: 1.5em; font-weight: bold;">Insights AI</div>
-        <nav>
-            <a href="#" style="color: white; text-decoration: none; margin-left: 20px;">Register</a>
-            <a href="#" style="color: white; text-decoration: none; margin-left: 20px;">Login</a>
-        </nav>
-    </header>
-    <div class="container" style="display: block; width: 80%; margin: 50px auto; border: 2px solid green;">
-        Container
-        <div class="image-section" style="width: 50%; float: left; background-color: lightblue; border: 1px dashed blue; box-sizing: border-box;">
-            Image Section
-            <img src="data:image/png;base64,{base64_image}" alt="Robot Hand" style="max-width: 80%; height: auto;">
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>SAMI AI</title>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap">
+        <style>
+            body {{ margin: 0; }}
+        </style>
+    </head>
+    <body class="homepage-body">
+        <header style="position: absolute; top: 20px; left: 20px; color: white; z-index: 10; border: 1px solid red; padding: 5px;">
+            <div class="logo" style="font-size: 1.5em; font-weight: bold;">Insights AI</div>
+            <nav>
+                <a href="#" style="color: white; text-decoration: none; margin-left: 20px;">Register</a>
+                <a href="#" style="color: white; text-decoration: none; margin-left: 20px;">Login</a>
+            </nav>
+        </header>
+        <div class="container" style="display: block; width: 80%; margin: 50px auto; border: 2px solid green;">
+            Container
+            <div class="image-section" style="width: 50%; float: left; background-color: lightblue; border: 1px dashed blue; box-sizing: border-box;">
+                Image Section
+                <img src="data:image/png;base64,{base64_image}" alt="Robot Hand" style="max-width: 80%; height: auto;">
+            </div>
+            <div class="content-section" style="width: 50%; float: left; background-color: lightcoral; border: 1px dashed orange; box-sizing: border-box;">
+                Content Section
+                <h1>SAMI AI</h1>
+                <p class="subtitle">EMPOWERING FUTURE TRENDS</p>
+                <p class="description">...</p>
+                <a href="/?start_app=true" class="get-started-button">Get Started</a>
+            </div>
+            <div style="clear: both;"></div>
         </div>
-        <div class="content-section" style="width: 50%; float: left; background-color: lightcoral; border: 1px dashed orange; box-sizing: border-box;">
-            Content Section
-            <h1>SAMI AI</h1>
-            <p class="subtitle">EMPOWERING FUTURE TRENDS</p>
-            <p class="description">...</p>
-            <a href="/?start_app=true" class="get-started-button">Get Started</a>
-        </div>
-        <div style="clear: both;"></div>
-    </div>
-</body>
-</html>
-"""
-st.components.v1.html(homepage_html, height=800)
+    </body>
+    </html>
+    """
+    st.components.v1.html(homepage_html, height=800)
+
+if 'start_app' in st.query_params:
+    st.title("🤖 Welcome to SAMI AI")
+    st.markdown("""
+    Welcome to your all-in-one AI-powered research assistant.
+    Use the sidebar to explore and analyze your data using advanced modules:
+    ... (rest of your Streamlit app content) ...
+    """)
+else:
+    show_homepage()
