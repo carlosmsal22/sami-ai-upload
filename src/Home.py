@@ -184,3 +184,4 @@ if 'start_app' in st.query_params:
     ... (rest of your Streamlit app content) ...
     """)
 else:
+     show_homepage()    
