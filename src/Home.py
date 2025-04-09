@@ -140,7 +140,7 @@ def show_homepage():
     }
     """
 
-homepage_html = f"""
+    homepage_html = f"""
     <!DOCTYPE html>
     <html lang="en">
     <head>
