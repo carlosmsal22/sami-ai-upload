@@ -141,40 +141,40 @@ def show_homepage():
     """
 
     homepage_html = f"""
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>SAMI AI</title>
-        <style>
-            {inlined_css}
-        </style>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap">
-    </head>
-    <body>
-        <header>
-            <div class="logo">Insights AI</div>
-            <nav>
-                <a href="#">Register</a>
-                <a href="#">Login</a>
-            </nav>
-        </header>
-        <div class="container">
-            <div class="image-section">
-                <img src="data:image/png;base64,{base64_image}" alt="Robot Hand">
-            </div>
-            <div class="content-section">
-                <h1>SAMI AI</h1>
-                <p class="subtitle">EMPOWERING FUTURE TRENDS</p>
-                <p class="description">Get AI-driven insights on emerging trends in markets, technology, and consumer behavior. Ask questions, explore categorized responses, and easily save or export your findings.</p>
-                <a href="/?start_app=true" class="get-started-button">Get Started</a>
-            </div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAMI AI</title>
+    <style>
+        {inlined_css}
+    </style>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap">
+</head>
+<body>
+    <header>
+        <div class="logo">Insights AI</div>
+        <nav>
+            <a href="#">Register</a>
+            <a href="#">Login</a>
+        </nav>
+    </header>
+    <div class="container" style="background-color: yellow;">
+        <div class="image-section" style="background-color: lightblue;">
+            <img src="data:image/png;base64,{base64_image}" alt="Robot Hand">
         </div>
-    </body>
-    </html>
-    """
-    st.components.v1.html(homepage_html, height=800)
+        <div class="content-section" style="background-color: lightcoral;">
+            <h1>SAMI AI</h1>
+            <p class="subtitle">EMPOWERING FUTURE TRENDS</p>
+            <p class="description">Get AI-driven insights on emerging trends in markets, technology, and consumer behavior. Ask questions, explore categorized responses, and easily save or export your findings.</p>
+            <a href="/?start_app=true" class="get-started-button">Get Started</a>
+        </div>
+    </div>
+</body>
+</html>
+"""
+st.components.v1.html(homepage_html, height=800)
 
 if 'start_app' in st.query_params:
     st.title("🤖 Welcome to SAMI AI")
