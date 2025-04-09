@@ -141,47 +141,34 @@ def show_homepage():
     """
 
     homepage_html = f"""
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>SAMI AI</title>
-        <style>
-            {inlined_css}
-        </style>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap">
-    </head>
-    <body>
-        <header>
-            <div class="logo">Insights AI</div>
-            <nav>
-                <a href="#">Register</a>
-                <a href="#">Login</a>
-            </nav>
-        </header>
-        <div class="container" style="background-color: yellow;">
-            <div class="image-section" style="background-color: lightblue;">
-                <img src="data:image/png;base64,{base64_image}" alt="Robot Hand">
-            </div>
-            <div class="content-section" style="background-color: lightcoral;">
-                <h1>SAMI AI</h1>
-                <p class="subtitle">EMPOWERING FUTURE TRENDS</p>
-                <p class="description">Get AI-driven insights on emerging trends in markets, technology, and consumer behavior. Ask questions, explore categorized responses, and easily save or export your findings.</p>
-                <a href="/?start_app=true" class="get-started-button">Get Started</a>
-            </div>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAMI AI</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap">
+</head>
+<body style="font-family: 'Roboto', sans-serif; margin: 0; background: linear-gradient(135deg, #37474F, #263238); color: #ECEFF1; display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 20px; box-sizing: border-box;">
+    <header style="position: absolute; top: 20px; left: 20px; display: flex; justify-content: space-between; align-items: center; width: calc(100% - 40px); color: white; z-index: 10;">
+        <div class="logo" style="font-size: 1.5em; font-weight: bold;">Insights AI</div>
+        <nav>
+            <a href="#" style="color: white; text-decoration: none; margin-left: 20px;">Register</a>
+            <a href="#" style="color: white; text-decoration: none; margin-left: 20px;">Login</a>
+        </nav>
+    </header>
+    <div class="container" style="display: flex; flex-direction: row; max-width: 1200px; width: 100%; background-color: yellow; border-radius: 10px; overflow: hidden; box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);">
+        <div class="image-section" style="flex: 0 0 50%; display: flex; justify-content: center; align-items: center; padding: 40px; background-color: lightblue;">
+            <img src="data:image/png;base64,{base64_image}" alt="Robot Hand" style="max-width: 80%; height: auto;">
         </div>
-    </body>
-    </html>
-    """
-    st.components.v1.html(homepage_html, height=800)
-
-if 'start_app' in st.query_params:
-    st.title("🤖 Welcome to SAMI AI")
-    st.markdown("""
-    Welcome to your all-in-one AI-powered research assistant.
-    Use the sidebar to explore and analyze your data using advanced modules:
-    ... (rest of your Streamlit app content) ...
-    """)
-else:
-    show_homepage()
+        <div class="content-section" style="flex: 0 0 50%; padding: 60px; display: flex; flex-direction: column; justify-content: center; align-items: flex-start; background-color: lightcoral;">
+            <h1 style="font-size: 3em; margin-bottom: 10px; color: #81D4FA;">SAMI AI</h1>
+            <p class="subtitle" style="font-size: 1.5em; color: #B0BEC5; margin-bottom: 20px;">EMPOWERING FUTURE TRENDS</p>
+            <p class="description" style="line-height: 1.6; margin-bottom: 30px;">Get AI-driven insights on emerging trends in markets, technology, and consumer behavior. Ask questions, explore categorized responses, and easily save or export your findings.</p>
+            <a href="/?start_app=true" class="get-started-button" style="background-color: #03A9F4; color: white; border: none; padding: 15px 30px; border-radius: 5px; font-size: 1.2em; cursor: pointer; transition: background-color 0.3s ease; text-decoration: none;">Get Started</a>
+        </div>
+    </div>
+</body>
+</html>
+"""
+st.components.v1.html(homepage_html, height=800)
