@@ -227,61 +227,15 @@ homepage_html = f"""
                 background-color: #0288D1;
             }}
 
-            .homepage-body header {{
-                position: absolute;
-                top: 20px;
-                left: 20px;
-                display: flex;
-                justify-content: space-between;
-                align-items: center;
-                width: calc(100% - 40px);
-                color: white;
-                z-index: 10;
-            }}
-
-            .homepage-body .logo {{
-                font-size: 1.5em;
-                font-weight: bold;
-            }}
-
-            .homepage-body nav a {{
-                color: white;
-                text-decoration: none;
-                margin-left: 20px;
-            }}
-
-            .homepage-body nav a:hover {{
-                color: #81D4FA;
-            }}
-
-            @media (max-width: 900px) {{
-                .homepage-body .container {{
-                    flex-direction: column;
-                }}
-                .homepage-body .image-section, .homepage-body .content-section {{
-                    flex: 0 0 100%;
-                    padding: 30px;
-                    text-align: center;
-                    align-items: center;
-                }}
-                .homepage-body .content-section {{
-                    align-items: center;
-                }}
-                .homepage-body .image-section img {{
-                    max-width: 50%;
-                }}
-                .homepage-body header {{
-                    flex-direction: column;
-                    align-items: center;
-                    text-align: center;
-                }}
-                .homepage-body nav {{
-                    margin-top: 10px;
-                }}
-                .homepage-body nav a {{
-                    margin: 0 10px;
-                }}
-            }}
+      homepage_html = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>SAMI AI</title>
+        <style>
+            /* Your Flexbox CSS here, targeting .homepage-body and its children */
         </style>
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap">
     </head>
@@ -307,4 +261,14 @@ homepage_html = f"""
     </body>
     </html>
     """
-st.components.v1.html(homepage_html, height=800)
+    st.components.v1.html(homepage_html, height=800)
+
+if 'start_app' in st.query_params:
+    st.title("🤖 Welcome to SAMI AI")
+    st.markdown("""
+    Welcome to your all-in-one AI-powered research assistant.
+    Use the sidebar to explore and analyze your data using advanced modules:
+    ... (rest of your Streamlit app content) ...
+    """)
+else:
+    show_homepage()
