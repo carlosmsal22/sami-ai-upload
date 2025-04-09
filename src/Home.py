@@ -307,4 +307,4 @@ homepage_html = f"""
     </body>
     </html>
     """
-    st.components.v1.html(homepage_html, height=800)
+st.components.v1.html(homepage_html, height=800)
