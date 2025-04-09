@@ -149,7 +149,7 @@ homepage_html = f"""
     <title>SAMI AI</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap">
     <style>
-        body { margin: 0; }
+        body {{ margin: 0; }}
     </style>
 </head>
 <body class="homepage-body">
