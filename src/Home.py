@@ -140,169 +140,40 @@ def show_homepage():
     }
     """
 
-    homepage_html = f"""
+homepage_html = f"""
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>SAMI AI</title>
-    <style>
-        .homepage-body {{
-            font-family: 'Roboto', sans-serif;
-            margin: 0;
-            background: linear-gradient(135deg, #37474F, #263238);
-            color: #ECEFF1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            padding: 20px;
-            box-sizing: border-box;
-        }}
-
-        .homepage-body .container {{
-            display: flex;
-            flex-direction: row;
-            max-width: 1200px;
-            width: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            border-radius: 10px;
-            overflow: hidden;
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
-        }}
-
-        .homepage-body .image-section {{
-            flex: 0 0 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 40px;
-        }}
-
-        .homepage-body .image-section img {{
-            max-width: 80%;
-            height: auto;
-        }}
-
-        .homepage-body .content-section {{
-            flex: 0 0 50%;
-            padding: 60px;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: flex-start;
-        }}
-
-        .homepage-body h1 {{
-            font-size: 3em;
-            margin-bottom: 10px;
-            color: #81D4FA;
-        }}
-
-        .homepage-body .subtitle {{
-            font-size: 1.5em;
-            color: #B0BEC5;
-            margin-bottom: 20px;
-        }}
-
-        .homepage-body .description {{
-            line-height: 1.6;
-            margin-bottom: 30px;
-        }}
-
-        .homepage-body .get-started-button {{
-            background-color: #03A9F4;
-            color: white;
-            border: none;
-            padding: 15px 30px;
-            border-radius: 5px;
-            font-size: 1.2em;
-            cursor: pointer;
-            transition: background-color 0.3s ease;
-            text-decoration: none;
-        }}
-
-        .homepage-body .get-started-button:hover {{
-            background-color: #0288D1;
-        }}
-
-        .homepage-body header {{
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            width: calc(100% - 40px);
-            color: white;
-            z-index: 10;
-        }}
-
-        .homepage-body .logo {{
-            font-size: 1.5em;
-            font-weight: bold;
-        }}
-
-        .homepage-body nav a {{
-            color: white;
-            text-decoration: none;
-            margin-left: 20px;
-        }}
-
-        .homepage-body nav a:hover {{
-            color: #81D4FA;
-        }}
-
-        @media (max-width: 900px) {{
-            .homepage-body .container {{
-                flex-direction: column;
-            }}
-            .homepage-body .image-section, .homepage-body .content-section {{
-                flex: 0 0 100%;
-                padding: 30px;
-                text-align: center;
-                align-items: center;
-            }}
-            .homepage-body .content-section {{
-                align-items: center;
-            }}
-            .homepage-body .image-section img {{
-                max-width: 50%;
-            }}
-            .homepage-body header {{
-                flex-direction: column;
-                align-items: center;
-                text-align: center;
-            }}
-            .homepage-body nav {{
-                margin-top: 10px;
-            }}
-            .homepage-body nav a {{
-                margin: 0 10px;
-            }}
-        }}
-    </style>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap">
+    <style>
+        body { margin: 0; }
+    </style>
 </head>
 <body class="homepage-body">
-    <header>
-        <div class="logo">Insights AI</div>
+    <header style="position: absolute; top: 20px; left: 20px; color: white; z-index: 10; border: 1px solid red; padding: 5px;">
+        <div class="logo" style="font-size: 1.5em; font-weight: bold;">Insights AI</div>
         <nav>
-            <a href="#">Register</a>
-            <a href="#">Login</a>
+            <a href="#" style="color: white; text-decoration: none; margin-left: 20px;">Register</a>
+            <a href="#" style="color: white; text-decoration: none; margin-left: 20px;">Login</a>
         </nav>
     </header>
-    <div class="container">
-        <div class="image-section">
-            <img src="data:image/png;base64,{base64_image}" alt="Robot Hand">
+    <div class="container" style="display: block; width: 80%; margin: 50px auto; border: 2px solid green;">
+        Container
+        <div class="image-section" style="width: 50%; float: left; background-color: lightblue; border: 1px dashed blue; box-sizing: border-box;">
+            Image Section
+            <img src="data:image/png;base64,{base64_image}" alt="Robot Hand" style="max-width: 80%; height: auto;">
         </div>
-        <div class="content-section">
+        <div class="content-section" style="width: 50%; float: left; background-color: lightcoral; border: 1px dashed orange; box-sizing: border-box;">
+            Content Section
             <h1>SAMI AI</h1>
             <p class="subtitle">EMPOWERING FUTURE TRENDS</p>
-            <p class="description">Get AI-driven insights on emerging trends in markets, technology, and consumer behavior. Ask questions, explore categorized responses, and easily save or export your findings.</p>
+            <p class="description">...</p>
             <a href="/?start_app=true" class="get-started-button">Get Started</a>
         </div>
+        <div style="clear: both;"></div>
     </div>
 </body>
 </html>
