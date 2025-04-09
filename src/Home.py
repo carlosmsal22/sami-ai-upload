@@ -140,7 +140,7 @@ def show_homepage():
     }
     """
 
-homepage_html = f"""
+    homepage_html = f"""
     <!DOCTYPE html>
     <html lang="en">
     <head>
@@ -148,94 +148,7 @@ homepage_html = f"""
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>SAMI AI</title>
         <style>
-            .homepage-body {{
-                font-family: 'Roboto', sans-serif;
-                margin: 0;
-                background: linear-gradient(135deg, #37474F, #263238);
-                color: #ECEFF1;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                min-height: 100vh;
-                padding: 20px;
-                box-sizing: border-box;
-            }}
-
-            .homepage-body .container {{
-                display: flex;
-                flex-direction: row;
-                max-width: 1200px;
-                width: 100%;
-                background-color: rgba(0, 0, 0, 0.5);
-                border-radius: 10px;
-                overflow: hidden;
-                box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
-            }}
-
-            .homepage-body .image-section {{
-                flex: 0 0 50%;
-                display: flex;
-                justify-content: center;
-                align-items: center;
-                padding: 40px;
-            }}
-
-            .homepage-body .image-section img {{
-                max-width: 80%;
-                height: auto;
-            }}
-
-            .homepage-body .content-section {{
-                flex: 0 0 50%;
-                padding: 60px;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                align-items: flex-start;
-            }}
-
-            .homepage-body h1 {{
-                font-size: 3em;
-                margin-bottom: 10px;
-                color: #81D4FA;
-            }}
-
-            .homepage-body .subtitle {{
-                font-size: 1.5em;
-                color: #B0BEC5;
-                margin-bottom: 20px;
-            }}
-
-            .homepage-body .description {{
-                line-height: 1.6;
-                margin-bottom: 30px;
-            }}
-
-            .homepage-body .get-started-button {{
-                background-color: #03A9F4;
-                color: white;
-                border: none;
-                padding: 15px 30px;
-                border-radius: 5px;
-                font-size: 1.2em;
-                cursor: pointer;
-                transition: background-color 0.3s ease;
-                text-decoration: none;
-            }}
-
-            .homepage-body .get-started-button:hover {{
-                background-color: #0288D1;
-            }}
-
-      homepage_html = f"""
-<!DOCTYPE html>
-    <html lang="en">
-    <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>SAMI AI</title>
-        <style>
-            /* Your Flexbox CSS here, targeting .homepage-body and its children */
+            {inlined_css}
         </style>
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap">
     </head>
