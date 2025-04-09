@@ -178,7 +178,7 @@ def show_homepage():
     </body>
     </html>
     """
-    st.components.v1.html(homepage_html, height=800)
+st.components.v1.html(homepage_html, height=800)
 
 if 'start_app' in st.query_params:
     st.title("🤖 Welcome to SAMI AI")
