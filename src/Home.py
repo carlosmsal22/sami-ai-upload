@@ -241,8 +241,8 @@ elif st.session_state.view_state == 'content':
     show_content_block_html()
 
 elif st.session_state.view_state == 'image':
-    # Display the image
-    st.image(f"data:image/png;base64,{base64_robot_hand_image}", use_column_width='always')
+    # Display the image using the container width
+    st.image(f"data:image/png;base64,{base64_robot_hand_image}", use_container_width=True) # <-- Change is here
 
     # Add a button *below* the image to trigger the transition to the content block
     # We use columns to center the button
