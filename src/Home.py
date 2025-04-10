@@ -154,21 +154,25 @@ elif current_state == 'content':
     show_content_block_html()
 
 elif current_state == 'image':
-    st.write("DEBUGGING: Displaying initial image view.") # Debug print
-    # Display the image using the container width
-    st.image(f"data:image/png;base64,{base64_robot_hand_image}", use_container_width=True)
+    st.write("DEBUGGING: Displaying initial image view (Simplified Test - Text Only).") # Debug print
 
-    # Add a button *below* the image to trigger the transition to the content block
+    # --- SIMPLIFICATION FOR TESTING ---
+    # Replace image with simple text to see if *anything* renders initially
+    st.header("INITIAL VIEW TEST")
+    st.write("If you see this text, the 'image' state branch is being executed correctly.")
+    st.info("The next step is to click the button below.")
+    # --- END SIMPLIFICATION ---
+
+    # Comment out the image line completely for this test
+    # st.image(f"data:image/png;base64,{base64_robot_hand_image}", use_container_width=True)
+
+    # Keep the button
     col1, col2, col3 = st.columns([2, 1, 2]) # Centering columns
     with col2:
         if st.button("Proceed", key="show_content_button", help="Click to see more options"):
             st.session_state.view_state = 'content'
             st.write(f"DEBUGGING: 'Proceed' button clicked. Setting view_state to 'content'. Rerunning.") # Debug print
             st.rerun() # Rerun the script to show the content block
-else:
-    # Fallback if state is somehow invalid
-    st.error(f"DEBUGGING: Invalid view_state encountered: {current_state}")
-    st.session_state.view_state = 'image' # Reset to default
     st.rerun()
 
 
