@@ -137,14 +137,20 @@ elif current_state == 'content':
     show_content_block_html()
 
 elif current_state == 'image':
-    # --- Using Simplified Text View for Now ---
-    st.write("DEBUGGING: Displaying initial image view (Simplified Test - Text Only).") # Debug print
-    st.header("INITIAL VIEW TEST")
-    st.write("If you see this text, the 'image' state branch is being executed correctly.")
-    st.info("The next step is to click the button below.")
-    # st.image(f"data:image/png;base64,{base64_robot_hand_image}", use_container_width=True) # Image commented out
+    st.write("DEBUGGING: Displaying initial image view (Using URL).") # Debug print
 
-    # Keep the button
+    # --- Use the hosted image URL ---
+    # Use the raw GitHub content URL:
+    IMAGE_URL = "https://raw.githubusercontent.com/carlosmsal22/sami-ai-upload/main/images/robot-hand.png" # <-- CORRECT RAW URL
+
+    # Remove the warning check now that we have the real URL
+    # if IMAGE_URL == "YOUR_HOSTED_IMAGE_URL_HERE": ...
+
+    st.image(IMAGE_URL, use_container_width=True) # Use the URL
+    # --- End image display ---
+
+
+    # Keep the button below the image
     col1, col2, col3 = st.columns([2, 1, 2]) # Centering columns
     with col2:
         if st.button("Proceed", key="show_content_button", help="Click to see more options"):
