@@ -220,7 +220,7 @@ def show_main_app():
     # else:
          # Optionally display something if no module is selected yet after landing
          # st.info("Select a module from the sidebar to begin.")
-         pass # Keep the welcome message visible
+pass # Keep the welcome message visible
 
 
 # --- Page Routing Logic ---
