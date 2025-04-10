@@ -1,5 +1,5 @@
 import streamlit as st
-import base64
+import base64 # Keep base64 import in case you need it elsewhere, though not used directly now
 
 # --- Configuration (Call ONCE at the top) ---
 st.set_page_config(
@@ -12,67 +12,72 @@ st.set_page_config(
 IMAGE_URL = "https://raw.githubusercontent.com/carlosmsal22/sami-ai-upload/main/images/robot-hand.png"
 
 # --- Initialize Session State ---
+# Only two states needed: 'landing' and 'app'
 if 'view_state' not in st.session_state:
-    st.session_state.view_state = 'landing'
-
-# --- DEBUGGING: Show current state at the start of each run ---
-st.write(f"DEBUGGING: Current view_state at start: {st.session_state.get('view_state', 'Not Set')}")
+    st.session_state.view_state = 'landing' # Start with the combined landing page
 
 
-# --- Helper Function to Show Combined Landing Page ---
+# --- Helper Function to Show Combined Landing Page (Image Background + Content) ---
 def show_landing_page_html(img_url):
-    st.write("DEBUGGING: Entering show_landing_page_html()")
-
-    # --- Modified CSS (Overlay Box Adjustments) ---
+    # --- CSS for Landing Page ---
     inlined_css = f"""
     body {{
         font-family: 'Roboto', sans-serif; margin: 0; color: #E0E0E0;
         display: flex; align-items: center; justify-content: center;
-        min-height: 98vh; box-sizing: border-box;
+        min-height: 98vh; /* Aim for full viewport height */
+        box-sizing: border-box;
         background-image: url('{img_url}'); background-size: cover;
         background-position: center center; background-repeat: no-repeat;
         background-attachment: fixed;
+        overflow: hidden; /* Try to prevent scrollbars on the body itself */
     }}
     .content-container {{
-        /* --- ADJUSTMENTS HERE --- */
-        background-color: rgba(0, 0, 0, 0.6); /* Slightly more transparent */
-        max-width: 550px; /* Narrower box */
+        /* --- Further adjustments to overlay box --- */
+        background-color: rgba(0, 0, 0, 0.6);
+        max-width: 500px; /* Even narrower */
         /* --- End Adjustments --- */
-        padding: 40px 50px; /* Adjusted padding slightly */
+        padding: 35px 45px; /* Adjusted padding */
         border-radius: 8px;
         box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
-        width: 90%; text-align: center;
+        width: 85%; /* Allow it to shrink on smaller viewports */
+        text-align: center;
         border: 1px solid rgba(255, 255, 255, 0.1);
+        margin-top: 20px; /* Add some top margin */
     }}
-    header {{
+    header {{ /* Header above the box */
         position: absolute; top: 20px; left: 0; width: 100%; padding: 0 40px;
         display: flex; justify-content: space-between; align-items: center;
         box-sizing: border-box; z-index: 10;
     }}
-    .logo {{ font-size: 1.4em; font-weight: bold; color: #FFFFFF; }}
-    nav a {{ color: #BBDEFB; text-decoration: none; margin-left: 20px; font-size: 1em; }}
+    .logo {{ font-size: 1.4em; font-weight: bold; color: #FFFFFF; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }}
+    nav a {{ color: #BBDEFB; text-decoration: none; margin-left: 20px; font-size: 1em; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);}}
     nav a:hover {{ color: #FFFFFF; text-decoration: underline; }}
-    h1 {{ font-size: 2.6em; /* Slightly smaller */ margin-bottom: 10px; color: #FFFFFF; }}
-    .subtitle {{ font-size: 1.2em; /* Slightly smaller */ color: #B0BEC5; margin-bottom: 25px; font-weight: 400; }}
-    .description {{ line-height: 1.6; margin-bottom: 30px; font-size: 0.95em; /* Slightly smaller */ color: #ECEFF1;}}
+
+    /* Content styling inside the box */
+    h1 {{ font-size: 2.4em; margin-bottom: 10px; color: #FFFFFF; }}
+    .subtitle {{ font-size: 1.1em; color: #B0BEC5; margin-bottom: 20px; font-weight: 400; }}
+    .description {{ line-height: 1.5; margin-bottom: 25px; font-size: 0.9em; color: #ECEFF1;}}
     .get-started-button {{
-        background-color: #03A9F4; color: white; border: none; padding: 12px 28px;
-        border-radius: 5px; font-size: 1.1em; cursor: pointer;
+        background-color: #03A9F4; color: white; border: none; padding: 10px 25px; /* Slightly smaller padding */
+        border-radius: 5px; font-size: 1.0em; /* Slightly smaller font */ cursor: pointer;
         transition: background-color 0.3s ease; text-decoration: none; display: inline-block;
     }}
     .get-started-button:hover {{ background-color: #0288D1; }}
+
+    /* Responsive adjustments */
     @media (max-width: 768px) {{
-        header {{ padding: 0 20px; flex-direction: column; text-align: center; position: static; margin-bottom: 30px; background-color: rgba(0,0,0,0.5); border-radius: 5px; padding: 10px; }}
+        body {{ background-attachment: scroll; overflow: auto; min-height: 100vh; }} /* Allow scroll on mobile */
+        header {{ position: static; flex-direction: column; text-align: center; margin-bottom: 20px; background-color: rgba(0,0,0,0.5); border-radius: 5px; padding: 10px; }}
         nav {{ margin-top: 10px; }}
         nav a {{ margin: 0 10px; }}
-        .content-container {{ padding: 30px 20px; max-width: 90%; /* Adjust width for mobile */}}
+        .content-container {{ padding: 25px 15px; max-width: 90%; margin-top: 0; }}
         h1 {{ font-size: 2.0em; }}
         .subtitle {{ font-size: 1.0em; }}
         .description {{ font-size: 0.9em; }}
-        body {{ background-attachment: scroll; }}
     }}
     """
 
+    # --- HTML Content (same as before) ---
     homepage_html = f"""
     <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -86,23 +91,19 @@ def show_landing_page_html(img_url):
         <a href="/?start_app=true" class="get-started-button" target="_self">Get Started</a>
         </div></body></html>
     """
-    st.components.v1.html(homepage_html, height=750, scrolling=False)
-    st.write("DEBUGGING: Exiting show_landing_page_html()")
+    # Increase height closer to viewport height
+    st.components.v1.html(homepage_html, height=850, scrolling=False)
 
 
-# --- Helper Function to Show Main App ---
+# --- Helper Function to Show Main App (No Centering) ---
 def show_main_app():
-    st.write("DEBUGGING: Entering show_main_app()")
-
-    # --- Use columns to center the title and welcome text ---
-    col1, col2, col3 = st.columns([1, 2, 1]) # Adjust ratios (e.g., [1,3,1] for wider center)
-    with col2:
-        st.title("🤖 Welcome to SAMI AI")
-        st.markdown("""
-        Welcome to your all-in-one AI-powered research assistant.
-        Use the sidebar to explore and analyze your data using advanced modules:
-        """)
-    # --- End centering ---
+    # --- Welcome message - standard left alignment ---
+    st.title("🤖 Welcome to SAMI AI")
+    st.markdown("""
+    Welcome to your all-in-one AI-powered research assistant.
+    Use the sidebar to explore and analyze your data using advanced modules:
+    """)
+    # --- End Welcome message ---
 
     # --- Sidebar Definition (Remains the same) ---
     with st.sidebar:
@@ -117,44 +118,37 @@ def show_main_app():
             "Persona Generator": "PersonaGen", "SAMI Analyzer": "SAMI", "SEM Module": "SEM",
             "Text Analytics": "Text", "TURF Module": "TURF"
         }
+        # Display buttons and handle clicks
         for label, key in module_buttons.items():
             if st.button(label, key=f"btn_{key}"):
                 st.session_state.current_module = key
-                st.write(f"DEBUGGING: Sidebar button '{label}' clicked, current_module set to: {key}")
+                # Optionally add st.rerun() if clicking should immediately update main area
 
     # --- Main Area Content (Placeholder for Module Logic) ---
-    # Display module content if selected, otherwise the centered welcome message stays visible
+    # Display module content if selected, otherwise the welcome message stays
     if 'current_module' in st.session_state:
-         # Use columns again if you want module content centered too, otherwise it fills normally
-        col1_m, col2_m, col3_m = st.columns([1, 2, 1]) # Example centering for module content
-        with col2_m:
-            st.write(f"DEBUGGING: Displaying content for module: {st.session_state.current_module}")
-            st.header(f"Module: {st.session_state.current_module}")
-            st.info("Module content goes here...")
-    else:
-        st.write("DEBUGGING: No module selected yet (Welcome message shown centered).")
-
-    st.write("DEBUGGING: Exiting show_main_app()")
+        # Display module content normally (left-aligned)
+        st.header(f"Module: {st.session_state.current_module}")
+        st.info("Module content goes here...")
+        # Add your specific module UI elements here based on st.session_state.current_module
+    # else:
+        # No need for an else block if the welcome message should remain visible
 
 
-# --- Page Routing Logic (Remains the same) ---
+# --- Page Routing Logic (Cleaned - No Debugging) ---
 if st.query_params.get("start_app") == "true":
-    st.write("DEBUGGING: Query param 'start_app=true' detected.")
     st.session_state.view_state = 'app'
     st.query_params.clear()
-    st.write(f"DEBUGGING: view_state set to 'app', query params cleared.")
 
 current_state = st.session_state.get('view_state', 'landing')
-st.write(f"DEBUGGING: Routing based on view_state: {current_state}")
 
 if current_state == 'app':
     show_main_app()
 elif current_state == 'landing':
     show_landing_page_html(IMAGE_URL)
 else:
-    st.error(f"DEBUGGING: Invalid view_state encountered: {current_state}")
+    # Fallback if state is invalid (shouldn't normally happen)
     st.session_state.view_state = 'landing'
     st.rerun()
 
-# --- Optional: Hide Streamlit Elements (Remains commented out for now) ---
-# ...
+# --- CSS Hiding Removed for simplicity, can be added back if needed ---
