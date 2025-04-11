@@ -1,141 +1,172 @@
 import streamlit as st
-import base64
 
-# --- Configuration (Call ONCE at the top) ---
+# --- Configuration (Sidebar starts expanded) ---
 st.set_page_config(
     layout="wide",
-    page_title="SAMI AI",
-    initial_sidebar_state="collapsed" # Start collapsed
+    page_title="SAMI AI"
+    # REMOVED: initial_sidebar_state="collapsed"
 )
 
 # --- Hosted Image URL ---
 IMAGE_URL = "https://raw.githubusercontent.com/carlosmsal22/sami-ai-upload/main/images/robot-hand.png"
 
 # --- Initialize Session State ---
-if 'view_state' not in st.session_state:
-    st.session_state.view_state = 'landing'
+# 'current_module' will store the key of the selected module, or None for landing
+if 'current_module' not in st.session_state:
+    st.session_state.current_module = None # Start on the landing/home view
 
-# --- Helper Function to Show Combined Landing Page ---
-# (This function remains the same as the previous version)
-def show_landing_page_html(img_url):
-    inlined_css = f"""
-    body {{
-        font-family: 'Roboto', sans-serif; margin: 0; color: #E0E0E0;
-        display: flex; align-items: center; justify-content: center;
-        min-height: 98vh; box-sizing: border-box;
-        background-image: url('{img_url}'); background-size: cover;
-        background-position: center center; background-repeat: no-repeat;
-        background-attachment: fixed; overflow: hidden;
+# --- Inject CSS for Background (Apply ONLY when on landing view) ---
+def set_landing_background(img_url):
+    css = f"""
+    <style>
+    /* Target the Streamlit app container - more specific than body */
+    [data-testid="stAppViewContainer"] > .main > div:first-child {{
+        background-image: url('{img_url}');
+        background-size: cover;
+        background-position: center center;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
     }}
-    .content-container {{
-        background-color: rgba(0, 0, 0, 0.6); max-width: 500px;
-        padding: 35px 45px; border-radius: 8px;
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4); width: 85%;
-        text-align: center; border: 1px solid rgba(255, 255, 255, 0.1);
-        margin-top: 20px;
+    /* Make header potentially transparent over background */
+     [data-testid="stHeader"] {{
+        background: rgba(0,0,0,0); /* Transparent background */
+        color: white; /* Assuming dark background, make header text white */
     }}
-    header {{
-        position: absolute; top: 20px; left: 0; width: 100%; padding: 0 40px;
-        display: flex; justify-content: space-between; align-items: center;
-        box-sizing: border-box; z-index: 10;
-    }}
-    .logo {{ font-size: 1.4em; font-weight: bold; color: #FFFFFF; text-shadow: 1px 1px 2px rgba(0,0,0,0.5); }}
-    nav a {{ color: #BBDEFB; text-decoration: none; margin-left: 20px; font-size: 1em; text-shadow: 1px 1px 2px rgba(0,0,0,0.5);}}
-    nav a:hover {{ color: #FFFFFF; text-decoration: underline; }}
-    h1 {{ font-size: 2.4em; margin-bottom: 10px; color: #FFFFFF; }}
-    .subtitle {{ font-size: 1.1em; color: #B0BEC5; margin-bottom: 20px; font-weight: 400; }}
-    .description {{ line-height: 1.5; margin-bottom: 25px; font-size: 0.9em; color: #ECEFF1;}}
-    .get-started-button {{
-        background-color: #03A9F4; color: white; border: none; padding: 10px 25px;
-        border-radius: 5px; font-size: 1.0em; cursor: pointer;
-        transition: background-color 0.3s ease; text-decoration: none; display: inline-block;
-    }}
-    .get-started-button:hover {{ background-color: #0288D1; }}
-    @media (max-width: 768px) {{
-        body {{ background-attachment: scroll; overflow: auto; min-height: 100vh; }}
-        header {{ position: static; flex-direction: column; text-align: center; margin-bottom: 20px; background-color: rgba(0,0,0,0.5); border-radius: 5px; padding: 10px; }}
-        nav {{ margin-top: 10px; }}
-        nav a {{ margin: 0 10px; }}
-        .content-container {{ padding: 25px 15px; max-width: 90%; margin-top: 0; }}
-        h1 {{ font-size: 2.0em; }}
-        .subtitle {{ font-size: 1.0em; }}
-        .description {{ font-size: 0.9em; }}
-    }}
+     [data-testid="stHeader"] [data-testid="stWidgetLabel"] a {{
+         color: white; /* Style links in header if any */
+     }}
+     /* Style the overlay text container if needed */
+     .landing-content {{
+        background-color: rgba(0, 0, 0, 0.6);
+        max-width: 500px;
+        padding: 35px 45px;
+        border-radius: 8px;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+        text-align: center;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: #E0E0E0; /* Text color for overlay */
+        margin: auto; /* Center the box */
+        margin-top: 15vh; /* Adjust vertical position */
+     }}
+     .landing-content h1 {{ color: #FFFFFF; font-size: 2.4em; margin-bottom: 10px;}}
+     .landing-content p {{ color: #ECEFF1; line-height: 1.5; font-size: 0.9em; }}
+     .landing-content .subtitle {{ color: #B0BEC5; font-size: 1.1em; margin-bottom: 20px; font-weight: 400; }}
+     /* Hide default Streamlit elements ONLY on landing page */
+     [data-testid="stSidebar"] + [data-testid="stAppViewContainer"] [data-testid="stHeader"] {{
+         /* This tries to hide the header only when sidebar is present and we are in landing */
+         /* Might need adjustment based on Streamlit version / DOM structure */
+        visibility: hidden;
+     }}
+
+    </style>
     """
-    homepage_html = f"""
-    <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>SAMI AI</title><style>{inlined_css}</style>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap">
-    </head><body><header><div class="logo">Insights AI</div><nav>
-        <a href="#">Register</a><a href="#">Login</a></nav></header>
-        <div class="content-container"><h1>SAMI AI</h1>
-        <p class="subtitle">EMPOWERING FUTURE TRENDS</p>
-        <p class="description">Get AI-driven insights on emerging trends in markets, technology, and consumer behavior. Ask questions, explore categorized responses, and easily save or export your findings.</p>
-        <a href="/?start_app=true" class="get-started-button" target="_self">Get Started</a>
-        </div></body></html>
-    """
-    st.components.v1.html(homepage_html, height=850, scrolling=False)
+    st.markdown(css, unsafe_allow_html=True)
 
-
-# --- Helper Function to Show Main App ---
-def show_main_app():
-    # --- Use columns to center the initial welcome content ---
-    col1, col_center, col3 = st.columns([1, 2, 1]) # Adjust ratios as needed
-
+# --- Define Landing Page Content (using native elements) ---
+def show_landing_content():
+    # Use columns to help center the overlay box vertically/horizontally
+    col1, col_center, col3 = st.columns([1, 2, 1])
     with col_center:
-        # Display centered content initially
-        st.title("🤖 Welcome to SAMI AI")
-        st.markdown("""
-        Welcome to your all-in-one AI-powered research assistant.
-        """)
-        st.info("👈 Click the arrow in the upper-left corner to expand the sidebar and access the analysis modules.", icon="ℹ️")
-
-    # --- Sidebar Definition ---
-    with st.sidebar:
-        # --- THIS IS THE MODIFIED HOME BUTTON ---
-        if st.button("🏠 Home", key="btn_home", help="Return to Landing Page"):
-             st.session_state.view_state = 'landing'
-             # Optional: Clear the current module selection when going home
-             if 'current_module' in st.session_state:
-                 del st.session_state.current_module
-             st.rerun() # Force rerun to display the landing page
-        # --- END MODIFICATION ---
-
-        st.markdown("---")
-        st.subheader("Analysis Modules")
-        module_buttons = {
-            "CBC Conjoint": "CBC", "CrossTabs Analyzer Phase1": "CrossTabs1",
-            "Enhanced CrossTabs Analyzer": "CrossTabs2", "Executive Insight Generator old": "ExecOld",
-            "LCA Module": "LCA", "MaxDiff Module": "MaxDiff", "OLD CrossTabs Analyzer": "OldCrossTabs1",
-            "OLD CrossTabs Step2": "OldCrossTabs2", "Persona From PPTX": "PersonaPPTX",
-            "Persona Generator": "PersonaGen", "SAMI Analyzer": "SAMI", "SEM Module": "SEM",
-            "Text Analytics": "Text", "TURF Module": "TURF"
-        }
-        for label, key in module_buttons.items():
-            if st.button(label, key=f"btn_{key}"):
-                st.session_state.current_module = key
-                # Optional rerun if needed: st.rerun()
-
-    # --- Main Area Content (Placeholder for Module Logic) ---
-    # Display module content if selected (appears below centered welcome message)
-    if 'current_module' in st.session_state:
-        st.header(f"Module: {st.session_state.current_module}")
-        st.info("Module content goes here...")
-        # Add your specific module UI elements here
+        # Use st.markdown with class for styling via CSS above
+        st.markdown(
+            """
+            <div class="landing-content">
+                <h1>SAMI AI</h1>
+                <p class="subtitle">EMPOWERING FUTURE TRENDS</p>
+                <p>Get AI-driven insights on emerging trends in markets, technology, and consumer behavior. Ask questions, explore categorized responses, and easily save or export your findings.</p>
+                <p style="font-size: 0.8em; margin-top: 30px;"><i>Select a module from the sidebar to begin.</i></p>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+    # Add placeholder elements to push content down if needed (adjust spacer height)
+    # st.markdown("<div style='height: 20vh;'></div>", unsafe_allow_html=True)
 
 
-# --- Page Routing Logic ---
-if st.query_params.get("start_app") == "true":
-    st.session_state.view_state = 'app'
-    st.query_params.clear()
+# --- Define Module Content Area ---
+def show_module_content(module_key):
+    if module_key == "SAMI": # Example for SAMI Analyzer
+         # Use screenshot 750 as a guide for the required layout
+         st.subheader("📊 SAMI AI - Advanced Analytics Suite") # Example Title
+         st.caption("Upload your dataset and discover actionable insights.")
 
-current_state = st.session_state.get('view_state', 'landing')
+         # File Uploader
+         uploaded_file = st.file_uploader("Upload your dataset", type=['csv', 'xlsx'])
+         if uploaded_file:
+              st.success(f"File '{uploaded_file.name}' uploaded.")
+              # Add logic to load/process file (e.g., df = pd.read_csv(uploaded_file))
 
-if current_state == 'app':
-    show_main_app()
-elif current_state == 'landing':
-    show_landing_page_html(IMAGE_URL)
+         # Input field
+         st.text_input("Ask a question about your data:", placeholder="E.g. What are the key drivers of satisfaction?")
+
+         st.markdown("---") # Separator
+
+         # Analysis Options (use columns for layout)
+         col1, col2, col3 = st.columns(3)
+         with col1:
+             st.checkbox("📈 Correlation Matrix")
+             st.checkbox("📊 Distributions")
+         with col2:
+             st.checkbox("🌀 PCA Projection")
+             st.checkbox("🧩 Clustering")
+         with col3:
+             st.checkbox("📝 Text Analysis (Coming Soon)", disabled=True)
+             st.checkbox("⚠️ Anomaly Detection")
+
+         st.markdown("---")
+
+         # How to use expander
+         with st.expander("ℹ️ How to use this tool"):
+              st.write("Instructions go here...")
+
+         # Run button
+         st.button("🚀 Run Analysis", type="primary")
+
+    else:
+         # Default for other modules
+         st.header(f"Module: {module_key}")
+         st.info("Module content goes here...")
+
+
+# --- Sidebar Definition ---
+with st.sidebar:
+    # Home Button - sets current_module to None
+    if st.button("🏠 Home", key="btn_home", help="Return to Landing Page"):
+        st.session_state.current_module = None
+        st.rerun() # Rerun to reflect the change
+
+    st.markdown("---")
+    st.subheader("Analysis Modules")
+    module_buttons = {
+        "CBC Conjoint": "CBC", "CrossTabs Analyzer Phase1": "CrossTabs1",
+        "Enhanced CrossTabs Analyzer": "CrossTabs2", "Executive Insight Generator old": "ExecOld",
+        "LCA Module": "LCA", "MaxDiff Module": "MaxDiff", "OLD CrossTabs Analyzer": "OldCrossTabs1",
+        "OLD CrossTabs Step2": "OldCrossTabs2", "Persona From PPTX": "PersonaPPTX",
+        "Persona Generator": "PersonaGen", "SAMI Analyzer": "SAMI", "SEM Module": "SEM",
+        "Text Analytics": "Text", "TURF Module": "TURF"
+    }
+    for label, key in module_buttons.items():
+        # When a module button is clicked, store its key
+        if st.button(label, key=f"btn_{key}"):
+            st.session_state.current_module = key
+            st.rerun() # Rerun to show the selected module
+
+    # --- Add Analysis Settings from screenshot 750 ---
+    st.markdown("---")
+    st.subheader("Analysis Settings")
+    analysis_mode = st.radio("Analysis Mode", ["Basic EDA", "Advanced Insights", "Predictive Modeling"])
+    with st.expander("Advanced options"):
+         st.write("Advanced settings here...")
+
+
+# --- Main Area Logic ---
+selected_module = st.session_state.get('current_module', None)
+
+if selected_module is None:
+    # Show landing page content
+    set_landing_background(IMAGE_URL) # Apply background CSS
+    show_landing_content()
 else:
-    st.session_state.view_state = 'landing'
-    st.rerun()
+    # Show the selected module's content
+    # Don't apply landing background CSS here
+    show_module_content(selected_module)
