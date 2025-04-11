@@ -78,23 +78,30 @@ def show_landing_page_html(img_url):
     st.components.v1.html(homepage_html, height=850, scrolling=False)
 
 
-# --- Helper Function to Show Main App (NOW CENTERED with Prompt) ---
+# --- Helper Function to Show Main App ---
 def show_main_app():
-    # --- Use columns to center the main content ---
-    col1, col_center, col3 = st.columns([1, 2, 1]) # Adjust ratios as needed ([1,3,1] etc.)
+    # --- Use columns to center the initial welcome content ---
+    col1, col_center, col3 = st.columns([1, 2, 1]) # Adjust ratios as needed
 
     with col_center:
-        # Display centered content
+        # Display centered content initially
         st.title("🤖 Welcome to SAMI AI")
         st.markdown("""
         Welcome to your all-in-one AI-powered research assistant.
-        """) # Keep text shorter or use text-align center if needed
-
+        """)
         st.info("👈 Click the arrow in the upper-left corner to expand the sidebar and access the analysis modules.", icon="ℹ️")
 
-    # --- Sidebar Definition (Remains the same) ---
+    # --- Sidebar Definition ---
     with st.sidebar:
-        st.page_link("Home.py", label="Home", icon="🏠")
+        # --- THIS IS THE MODIFIED HOME BUTTON ---
+        if st.button("🏠 Home", key="btn_home", help="Return to Landing Page"):
+             st.session_state.view_state = 'landing'
+             # Optional: Clear the current module selection when going home
+             if 'current_module' in st.session_state:
+                 del st.session_state.current_module
+             st.rerun() # Force rerun to display the landing page
+        # --- END MODIFICATION ---
+
         st.markdown("---")
         st.subheader("Analysis Modules")
         module_buttons = {
@@ -108,18 +115,17 @@ def show_main_app():
         for label, key in module_buttons.items():
             if st.button(label, key=f"btn_{key}"):
                 st.session_state.current_module = key
+                # Optional rerun if needed: st.rerun()
 
     # --- Main Area Content (Placeholder for Module Logic) ---
-    # This will now appear below the centered welcome message if a module is selected
-    # If you want modules ALSO centered, wrap this section in columns too.
+    # Display module content if selected (appears below centered welcome message)
     if 'current_module' in st.session_state:
-        # Example: Displaying module content (currently not centered)
         st.header(f"Module: {st.session_state.current_module}")
         st.info("Module content goes here...")
-        # Add your specific module UI elements here based on st.session_state.current_module
+        # Add your specific module UI elements here
 
 
-# --- Page Routing Logic (Cleaned) ---
+# --- Page Routing Logic ---
 if st.query_params.get("start_app") == "true":
     st.session_state.view_state = 'app'
     st.query_params.clear()
