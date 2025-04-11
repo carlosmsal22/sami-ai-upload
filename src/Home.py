@@ -4,22 +4,19 @@ import streamlit as st
 st.set_page_config(
     layout="wide",
     page_title="SAMI AI"
-    # REMOVED: initial_sidebar_state="collapsed"
 )
 
 # --- Hosted Image URL ---
 IMAGE_URL = "https://raw.githubusercontent.com/carlosmsal22/sami-ai-upload/main/images/robot-hand.png"
 
 # --- Initialize Session State ---
-# 'current_module' will store the key of the selected module, or None for landing/home
 if 'current_module' not in st.session_state:
-    st.session_state.current_module = None # Start on the landing/home view
-
+    st.session_state.current_module = None
 
 # --- Helper Function to Show Landing Page HTML Component ---
-# (Brought back from previous successful version)
 def show_landing_page_html(img_url):
-    # CSS applies background to body WITHIN this HTML component
+    # (Content of this function remains exactly the same as the previous version)
+    # ... (CSS and HTML for the landing page component) ...
     inlined_css = f"""
     body {{
         font-family: 'Roboto', sans-serif; margin: 0; color: #E0E0E0;
@@ -47,9 +44,7 @@ def show_landing_page_html(img_url):
     h1 {{ font-size: 2.4em; margin-bottom: 10px; color: #FFFFFF; }}
     .subtitle {{ font-size: 1.1em; color: #B0BEC5; margin-bottom: 20px; font-weight: 400; }}
     .description {{ line-height: 1.5; margin-bottom: 25px; font-size: 0.9em; color: #ECEFF1;}}
-    /* --- Removed Get Started Button, replaced with prompt --- */
     .prompt {{ font-size: 0.9em; margin-top: 30px; color: #B0BEC5; }}
-    /* --- Responsive adjustments (same as before) --- */
     @media (max-width: 768px) {{
         body {{ background-attachment: scroll; overflow: auto; min-height: 100vh; }}
         header {{ position: static; flex-direction: column; text-align: center; margin-bottom: 20px; background-color: rgba(0,0,0,0.5); border-radius: 5px; padding: 10px; }}
@@ -61,7 +56,6 @@ def show_landing_page_html(img_url):
         .description {{ font-size: 0.9em; }}
     }}
     """
-    # HTML content - Removed the <a href..> button, added a prompt paragraph
     homepage_html = f"""
     <!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -75,13 +69,16 @@ def show_landing_page_html(img_url):
         <p class="prompt"><i>Select a module from the sidebar to begin.</i></p>
         </div></body></html>
     """
-    # Render the HTML component
     st.components.v1.html(homepage_html, height=850, scrolling=False)
+    # Add a debug print *after* the component call too
+    st.write("DEBUG: Finished rendering HTML component")
 
 
 # --- Define Module Content Area ---
-# (This function remains the same, using standard Streamlit elements)
+# (This function remains the same)
 def show_module_content(module_key):
+    # (Content for modules, e.g., SAMI analyzer)
+    # ...
     if module_key == "SAMI": # Example for SAMI Analyzer
          st.subheader("📊 SAMI AI - Advanced Analytics Suite")
          st.caption("Upload your dataset and discover actionable insights.")
@@ -101,20 +98,22 @@ def show_module_content(module_key):
          with st.expander("ℹ️ How to use this tool"): st.write("Instructions go here...")
          st.button("🚀 Run Analysis", type="primary", key=f"run_{module_key}")
     else:
-         # Default for other modules
          st.header(f"Module: {module_key}")
          st.info("Module content goes here...")
+    st.write(f"DEBUG: Finished rendering module content for {module_key}")
 
 
 # --- Sidebar Definition ---
-# (Remains the same as previous version)
+# (Remains the same)
 with st.sidebar:
+    # ... (Home button and module buttons) ...
     if st.button("🏠 Home", key="btn_home", help="Return to Landing Page"):
         st.session_state.current_module = None
+        st.write("DEBUG: Home button clicked, setting current_module to None") # DEBUG
         st.rerun()
     st.markdown("---")
     st.subheader("Analysis Modules")
-    module_buttons = {
+    module_buttons = { # ... (module names and keys) ...
         "CBC Conjoint": "CBC", "CrossTabs Analyzer Phase1": "CrossTabs1",
         "Enhanced CrossTabs Analyzer": "CrossTabs2", "Executive Insight Generator old": "ExecOld",
         "LCA Module": "LCA", "MaxDiff Module": "MaxDiff", "OLD CrossTabs Analyzer": "OldCrossTabs1",
@@ -125,6 +124,7 @@ with st.sidebar:
     for label, key in module_buttons.items():
         if st.button(label, key=f"btn_{key}"):
             st.session_state.current_module = key
+            st.write(f"DEBUG: Module button '{label}' clicked, setting current_module to {key}") # DEBUG
             st.rerun()
     st.markdown("---")
     st.subheader("Analysis Settings")
@@ -134,12 +134,16 @@ with st.sidebar:
 
 
 # --- Main Area Logic ---
-# This logic determines whether to show the HTML landing page or a module's UI
 selected_module = st.session_state.get('current_module', None)
 
+# --- ADDED DEBUGGING HERE ---
+st.write(f"DEBUG: Checking routing. Value of selected_module: {selected_module} (Type: {type(selected_module)})")
+
 if selected_module is None:
-    # Show the HTML landing page when "Home" is selected
+    st.write("DEBUG: Condition 'selected_module is None' is TRUE. Calling show_landing_page_html...") # DEBUG
     show_landing_page_html(IMAGE_URL)
 else:
-    # Show the selected module's content using standard Streamlit elements
+    st.write(f"DEBUG: Condition 'selected_module is None' is FALSE. Calling show_module_content with key: {selected_module}") # DEBUG
     show_module_content(selected_module)
+
+st.write("--- End of Script Execution ---") # DEBUG
